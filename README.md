@@ -1,2 +1,2 @@
-# wealthsimple-formal-model
-Modeling an validation project for EECS4315 mission critical systems
+# Wealthsimple Forma Model
+Modeling and validation project for EECS4315 mission critical systems
