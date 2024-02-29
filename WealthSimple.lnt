@@ -1,0 +1,60 @@
+module WealthSimple with get, set is
+
+    channel Uid is (id: Nat) end channel
+    channel Balance is (id: Nat, b: Nat) end channel
+
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance] (ID: Nat) is
+        var disBalance: Nat, waiting: bool in
+            disBalance := 0;
+            waiting := false;
+            loop
+                select
+                    if waiting == false then
+                        GETBALANCE(ID);
+                        waiting := true
+                    end if
+                []
+                    var uid: Nat, newBalance: Nat in
+                        RECIVEBALANCE(?uid, ?newBalance);
+                        if (uid == ID) then
+                            disBalance := newBalance;
+                            waiting := false
+                        end if
+                    end var
+                []
+                    if disBalance != 0 then
+                        DISPLAYBALANCE(disBalance) -- Temp proccess cuz I don't know how to display values. If we even can?
+                    end if
+                end select
+            end loop
+        end var
+    end process
+
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance] is
+        var uid: Nat in
+            uid := 0;
+            loop
+                select
+                    GETBALANCE(?uid)
+                []
+                    if uid != 0 then
+                        SENDBALANCE(uid, 10 of Nat); -- Temp value for testing
+                        uid := 0
+                    end if
+                end select
+            end loop
+        end var
+    end process
+
+    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance] is
+        var u1: Nat in
+            u1 := 1;
+            par GETBALANCE, SENDBALANCE in
+                WSAccount [GETBALANCE, SENDBALANCE]
+                ||
+                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE] (u1)
+            end par
+        end var
+    end process
+
+end module
