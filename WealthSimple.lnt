@@ -31,19 +31,12 @@ module WealthSimple with get, set is
     end process
 
     process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance] is
-        var uid: Nat in
-            uid := 0;
-            loop
-                select
-                    GETBALANCE(?uid)
-                []
-                    if uid != 0 then
-                        SENDBALANCE(uid, 10 of Nat); -- Temp value for testing
-                        uid := 0
-                    end if
-                end select
-            end loop
-        end var
+        loop
+            var uid: Nat in
+                GETBALANCE(?uid);
+                SENDBALANCE(uid, 10 of Nat)
+            end var
+        end loop
     end process
 
     process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance] is
