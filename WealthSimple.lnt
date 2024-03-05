@@ -4,7 +4,7 @@ module WealthSimple with set, get is
     channel Balance is (id: Nat, b: Nat) end channel
     channel Amount is (id: Nat, a: Nat) end channel
 
-    type B is
+    type BalanceArray is
         array [1 .. 5] of Nat
     end type
 
@@ -46,10 +46,10 @@ module WealthSimple with set, get is
     end process
 
     process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] is
-        var balances: B in
+        var balances: BalanceArray in
 
             -- Init balances
-            balances := B(0 of Nat);
+            balances := BalanceArray(0 of Nat);
 
             loop
                 var uid: Nat in
@@ -59,18 +59,18 @@ module WealthSimple with set, get is
                     []
                         var amount: Nat in
                             DEPOSIT(?uid, ?amount);
-                            if (uid < 6) and (balances[uid] < 240) then -- Stop at 240 cuz Nat max value is 255
+                            if (uid < 6) and ((balances[uid] + amount) <= 240) then
                                 balances[uid] := balances[uid] + amount
-                            end if
-                            ;SENDBALANCE(uid, balances[uid])
+                            end if;
+                            SENDBALANCE(uid, balances[uid])
                         end var
                     []
                         var amount: Nat in
                             WITHDRAW(?uid, ?amount);
-                            if (uid < 6) and (balances[uid] > 0) then -- Stop at 0 cuz Nat min value is 0
+                            if (uid < 6) and ((balances[uid] - amount) >= 0) then
                                 balances[uid] := balances[uid] - amount
-                            end if
-                            ;SENDBALANCE(uid, balances[uid])
+                            end if;
+                            SENDBALANCE(uid, balances[uid])
                         end var
                     end select
                 end var
