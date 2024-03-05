@@ -8,7 +8,7 @@ module WealthSimple with set, get is
         array [1 .. 5] of Nat
     end type
 
-    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount] (ID: Nat) is
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] (ID: Nat) is
         var disBalance: Nat, waiting: bool in
             disBalance := 0;
             waiting := false;
@@ -35,12 +35,17 @@ module WealthSimple with set, get is
                         DEPOSIT(ID, 10 of Nat);
                         waiting := true
                     end if
+                []
+                    if (waiting == false) and (disBalance > 0) then
+                        WITHDRAW(ID, 10 of Nat);
+                        waiting := true
+                    end if
                 end select
             end loop
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] is
         var balances: B in
 
             -- Init balances
@@ -52,10 +57,18 @@ module WealthSimple with set, get is
                         GETBALANCE(?uid);
                         SENDBALANCE(uid, balances[uid])
                     []
-                        var newBalance: Nat in
-                            DEPOSIT(?uid, ?newBalance);
+                        var amount: Nat in
+                            DEPOSIT(?uid, ?amount);
                             if (uid < 6) and (balances[uid] < 240) then -- Stop at 240 cuz Nat max value is 255
-                                balances[uid] := balances[uid] + newBalance
+                                balances[uid] := balances[uid] + amount
+                            end if
+                            ;SENDBALANCE(uid, balances[uid])
+                        end var
+                    []
+                        var amount: Nat in
+                            WITHDRAW(?uid, ?amount);
+                            if (uid < 6) and (balances[uid] > 0) then -- Stop at 0 cuz Nat min value is 0
+                                balances[uid] := balances[uid] - amount
                             end if
                             ;SENDBALANCE(uid, balances[uid])
                         end var
@@ -65,13 +78,13 @@ module WealthSimple with set, get is
         end var
     end process
 
-    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount] is
+    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] is
         var u1: Nat in
             u1 := 1;
-            par GETBALANCE, SENDBALANCE, DEPOSIT in
-                WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT]
+            par GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW in
+                WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW]
                 ||
-                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT] (u1)
+                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW] (u1)
             end par
         end var
     end process
