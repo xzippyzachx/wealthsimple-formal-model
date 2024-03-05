@@ -1,13 +1,14 @@
-module WealthSimple with append, element is
+module WealthSimple with set, get is
 
     channel Uid is (id: Nat) end channel
     channel Balance is (id: Nat, b: Nat) end channel
+    channel Amount is (id: Nat, a: Nat) end channel
 
     type B is
-        list of Nat
+        array [1 .. 5] of Nat
     end type
 
-    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance] (ID: Nat) is
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount] (ID: Nat) is
         var disBalance: Nat, waiting: bool in
             disBalance := 0;
             waiting := false;
@@ -26,38 +27,51 @@ module WealthSimple with append, element is
                         end if
                     end var
                 []
-                    if disBalance != 0 then
+                    if (waiting == false) and (disBalance != 0) then
                         DISPLAYBALANCE(disBalance) -- Temp proccess cuz I don't know how to display values. If we even can?
+                    end if
+                []
+                    if waiting == false then
+                        DEPOSIT(ID, 10 of Nat);
+                        waiting := true
                     end if
                 end select
             end loop
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount] is
         var balances: B in
 
             -- Init balances
-            balances := {};
-            balances := append(40 of Nat, balances); -- Uid 1
-            balances := append(30 of Nat, balances); -- Uid 2
+            balances := B(0 of Nat);
 
             loop
                 var uid: Nat in
-                    GETBALANCE(?uid);
-                    SENDBALANCE(uid, element(balances, Uid))
+                    select
+                        GETBALANCE(?uid);
+                        SENDBALANCE(uid, balances[uid])
+                    []
+                        var newBalance: Nat in
+                            DEPOSIT(?uid, ?newBalance);
+                            if (uid < 6) and (balances[uid] < 240) then -- Stop at 240 cuz Nat max value is 255
+                                balances[uid] := balances[uid] + newBalance
+                            end if
+                            ;SENDBALANCE(uid, balances[uid])
+                        end var
+                    end select
                 end var
             end loop
         end var
     end process
 
-    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance] is
+    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount] is
         var u1: Nat in
             u1 := 1;
-            par GETBALANCE, SENDBALANCE in
-                WSAccount [GETBALANCE, SENDBALANCE]
+            par GETBALANCE, SENDBALANCE, DEPOSIT in
+                WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT]
                 ||
-                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE] (u1)
+                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT] (u1)
             end par
         end var
     end process
