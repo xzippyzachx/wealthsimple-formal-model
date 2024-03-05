@@ -1,7 +1,11 @@
-module WealthSimple with get, set is
+module WealthSimple with append, element is
 
     channel Uid is (id: Nat) end channel
     channel Balance is (id: Nat, b: Nat) end channel
+
+    type B is
+        list of Nat
+    end type
 
     process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance] (ID: Nat) is
         var disBalance: Nat, waiting: bool in
@@ -31,12 +35,20 @@ module WealthSimple with get, set is
     end process
 
     process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance] is
-        loop
-            var uid: Nat in
-                GETBALANCE(?uid);
-                SENDBALANCE(uid, 10 of Nat)
-            end var
-        end loop
+        var balances: B in
+
+            -- Init balances
+            balances := {};
+            balances := append(40 of Nat, balances); -- Uid 1
+            balances := append(30 of Nat, balances); -- Uid 2
+
+            loop
+                var uid: Nat in
+                    GETBALANCE(?uid);
+                    SENDBALANCE(uid, element(balances, Uid))
+                end var
+            end loop
+        end var
     end process
 
     process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance] is
