@@ -32,12 +32,24 @@ module WealthSimple with set, get is
                     end if
                 []
                     if waiting == false then
-                        DEPOSIT(ID, 10 of Nat);
+                        select
+                            DEPOSIT(ID, 5 of Nat)
+                        []
+                            DEPOSIT(ID, 10 of Nat)
+                        end select;
                         waiting := true
                     end if
                 []
-                    if (waiting == false) and (disBalance > 0) then
-                        WITHDRAW(ID, 10 of Nat);
+                    if (waiting == false) then
+                        select
+                            if (disBalance >= 5) then
+                                WITHDRAW(ID, 5 of Nat)
+                            end if
+                        []  
+                            if (disBalance >= 10) then
+                                WITHDRAW(ID, 10 of Nat)
+                            end if
+                        end select;
                         waiting := true
                     end if
                 end select
