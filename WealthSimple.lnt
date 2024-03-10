@@ -21,7 +21,7 @@ module WealthSimple with set, get is
                 []
                     var uid: Nat, newBalance: Nat in
                         RECIVEBALANCE(?uid, ?newBalance);
-                        if (uid == ID) then
+                        if uid == ID then
                             disBalance := newBalance;
                             waiting := false
                         end if
@@ -32,24 +32,16 @@ module WealthSimple with set, get is
                     end if
                 []
                     if waiting == false then
-                        select
-                            DEPOSIT(ID, 5 of Nat)
-                        []
-                            DEPOSIT(ID, 10 of Nat)
-                        end select;
+                        var a: Nat in
+                            DEPOSIT(ID, ?a) where (a == 5) or (a == 10) or (a == 20)
+                        end var;
                         waiting := true
                     end if
                 []
                     if (waiting == false) then
-                        select
-                            if (disBalance >= 5) then
-                                WITHDRAW(ID, 5 of Nat)
-                            end if
-                        []  
-                            if (disBalance >= 10) then
-                                WITHDRAW(ID, 10 of Nat)
-                            end if
-                        end select;
+                        var a: Nat in
+                            WITHDRAW(ID, ?a) where (a == 5) or (a == 10) or (a == 20)
+                        end var;
                         waiting := true
                     end if
                 end select
@@ -71,7 +63,7 @@ module WealthSimple with set, get is
                     []
                         var amount: Nat in
                             DEPOSIT(?uid, ?amount);
-                            if (uid < 6) and ((balances[uid] + amount) <= 240) then
+                            if (uid < 6) and (balances[uid] <= 235) then
                                 balances[uid] := balances[uid] + amount
                             end if;
                             SENDBALANCE(uid, balances[uid])
@@ -79,7 +71,7 @@ module WealthSimple with set, get is
                     []
                         var amount: Nat in
                             WITHDRAW(?uid, ?amount);
-                            if (uid < 6) and ((balances[uid] - amount) >= 0) then
+                            if (uid < 6) and (balances[uid] >= amount) then
                                 balances[uid] := balances[uid] - amount
                             end if;
                             SENDBALANCE(uid, balances[uid])
