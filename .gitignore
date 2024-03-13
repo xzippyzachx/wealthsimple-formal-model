@@ -1,3 +1,10 @@
 ocis
 *.bcg
 *.o
+*.err
+*.t
+*.lotos
+*.h
+*.f
+*.h.BAK
+*.c
