@@ -3,12 +3,18 @@ module WealthSimple with set, get is
     channel Uid is (id: Nat) end channel
     channel Balance is (id: Nat, b: Nat) end channel
     channel Amount is (id: Nat, a: Nat) end channel
+    channel Stock is (id: Nat, s: StockSymbol) end channel
+    channel Price is (id: Nat, s: StockSymbol, a: Nat) end channel
+
+    type StockSymbol is
+        AAPL, NVDA, TSLA, AMZN
+    end type
 
     type BalanceArray is
         array [1 .. 5] of Nat
     end type
 
-    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] (ID: Nat) is
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, RECIVEPRICE: Price] (ID: Nat) is
         var disBalance: Nat, waiting: bool in
             disBalance := 0;
             waiting := false;
@@ -44,12 +50,27 @@ module WealthSimple with set, get is
                         end var;
                         waiting := true
                     end if
+                []
+                    if (waiting == false) then
+                        var symbol: StockSymbol in
+                            symbol := any StockSymbol;
+                            CHECKPRICE(ID, symbol)
+                        end var;
+                        waiting := true
+                    end if
+                []
+                    var uid: Nat in -- , symbol: StockSymbol, price: Nat
+                        RECIVEPRICE(?uid, ?any StockSymbol, ?any Nat);
+                        if uid == ID then
+                            waiting := false
+                        end if
+                    end var
                 end select
             end loop
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price] is
         var balances: BalanceArray in
 
             -- Init balances
@@ -76,19 +97,30 @@ module WealthSimple with set, get is
                             end if;
                             SENDBALANCE(uid, balances[uid])
                         end var
+                    []
+                        var symbol: StockSymbol, price: Nat in
+                            CHECKPRICE(?uid, ?symbol);
+                            case symbol in -- This needs moved to the StockMarketAPI
+                                AAPL -> price := 20 of Nat
+                            |   NVDA -> price := 15 of Nat
+                            |   TSLA -> price := 10 of Nat
+                            |   AMZN -> price := 5 of Nat
+                            end case;
+                            SENDPRICE(uid, symbol, price)
+                        end var
                     end select
                 end var
             end loop
         end var
     end process
 
-    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount] is
+    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price] is
         var u1: Nat in
             u1 := 1;
-            par GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW in
-                WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW]
+            par GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE in
+                WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE]
                 ||
-                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW] (u1)
+                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE] (u1)
             end par
         end var
     end process
