@@ -79,7 +79,7 @@ module WealthSimple with set, get is
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price, WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend] is
         var balances: BalanceArray in
 
             -- Init balances
@@ -109,12 +109,10 @@ module WealthSimple with set, get is
                     []
                         var symbol: StockSymbol, price: Nat in
                             CHECKPRICE(?uid, ?symbol);
-                            case symbol in -- This needs moved to the StockMarketAPI
-                                AAPL -> price := 20 of Nat
-                            |   NVDA -> price := 15 of Nat
-                            |   TSLA -> price := 10 of Nat
-                            |   AMZN -> price := 5 of Nat
-                            end case;
+                            
+                            WSPRICECHECKING(uid, symbol);
+                            WSPRICESENDING(?uid, ?symbol, ?price);
+
                             SENDPRICE(uid, symbol, price)
                         end var
                     end select
@@ -124,20 +122,19 @@ module WealthSimple with set, get is
     end process
 
 
-    process StockMarketAPI [PRICECHECK: WSPriceCheck, PRICESEND: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is 
-
+    process StockMarketAPI [WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is 
         loop
             select
                 -- Handles receiving and sending stock prices on Channel WSPrice
                 var id: Nat, symbo: StockSymbol, price: Nat in 
-                    PRICECHECK(?id, ?symbo);
+                    WSPRICECHECKING(?id, ?symbo);
                     case symbo in
                             AAPL -> price := 20 of Nat
                         |   NVDA -> price := 15 of Nat
                         |   TSLA -> price := 10 of Nat
                         |   AMZN -> price := 5 of Nat
                     end case;
-                    PRICESEND(id, symbo, price)
+                    WSPRICESENDING(id, symbo, price)
                 end var
                 []
                 --Handles Mock trade confirmations
@@ -149,14 +146,16 @@ module WealthSimple with set, get is
         end loop
     end process
 
-
-    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price] is
+    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price, 
+                    WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is
         var u1: Nat in
             u1 := 1;
-            par GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE in
-                WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE]
+            par
+                GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE, WSPRICECHECKING, WSPRICESENDING -> WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE, WSPRICECHECKING, WSPRICESENDING]
                 ||
-                User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE] (u1)
+                GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE] (u1)
+                ||
+                WSPRICECHECKING, WSPRICESENDING -> StockMarketAPI[WSPRICECHECKING, WSPRICESENDING, TRADE, CONFIRMTRADE]
             end par
         end var
     end process
