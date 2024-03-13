@@ -6,12 +6,21 @@ module WealthSimple with set, get is
     channel Stock is (id: Nat, s: StockSymbol) end channel
     channel Price is (id: Nat, s: StockSymbol, a: Nat) end channel
 
+    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
+    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
+    channel WSTrade is (id: Nat, symbol: StockSymbol, Transacttype: TransactionType) end channel
+    channel WSTradeConfirm is (id: Nat, symbol: StockSymbol, Transacttype: TransactionType) end channel
+
     type StockSymbol is
         AAPL, NVDA, TSLA, AMZN
     end type
 
     type BalanceArray is
         array [1 .. 5] of Nat
+    end type
+
+    type TransactionType is 
+        Buy, Sell
     end type
 
     process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, RECIVEPRICE: Price] (ID: Nat) is
@@ -113,6 +122,33 @@ module WealthSimple with set, get is
             end loop
         end var
     end process
+
+
+    process StockMarketAPI [PRICECHECK: WSPriceCheck, PRICESEND: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is 
+
+        loop
+            select
+                -- Handles receiving and sending stock prices on Channel WSPrice
+                var id: Nat, symbo: StockSymbol, price: Nat in 
+                    PRICECHECK(?id, ?symbo);
+                    case symbo in
+                            AAPL -> price := 20 of Nat
+                        |   NVDA -> price := 15 of Nat
+                        |   TSLA -> price := 10 of Nat
+                        |   AMZN -> price := 5 of Nat
+                    end case;
+                    PRICESEND(id, symbo, price)
+                end var
+                []
+                --Handles Mock trade confirmations
+                var id: Nat, symbol: StockSymbol, Transacttype: TransactionType in 
+                    TRADE(?id, ?symbol, ?Transacttype);
+                    CONFIRMTRADE(id, symbol, Transacttype)
+                end var
+            end select
+        end loop
+    end process
+
 
     process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price] is
         var u1: Nat in
