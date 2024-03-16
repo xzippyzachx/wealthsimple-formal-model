@@ -12,6 +12,9 @@ module WealthSimple with set, get is
     channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
     channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
 
+    channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+
     type StockSymbol is
         AAPL, NVDA, TSLA, AMZN
     end type
@@ -80,7 +83,7 @@ module WealthSimple with set, get is
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm] is
         var balances: BalanceArray in
 
             -- Init balances
@@ -93,7 +96,11 @@ module WealthSimple with set, get is
                         SENDBALANCE(uid, balances[uid])
                     []
                         var amount: Nat, transactType: TransactionType in
-                            TRANSACTION(?uid, ?amount, ?transactType);
+                            UTRANSACTION(?uid, ?amount, ?transactType);
+                            
+                            WSTRANSACTION(uid, amount, transactType);
+                            WSCONFIRM(?uid, ?amount, ?transactType);
+
                             if uid < 6 then
                                 if (transactType == Deposit) and (balances[uid] <= 235) then
                                     balances[uid] := balances[uid] + amount
@@ -153,30 +160,24 @@ module WealthSimple with set, get is
         end loop
     end process
 
-    process BankAccountAPI [SENDCONFIRMATION: Balance, DEPOSIT: Amount, WITHDRAW: Amount ] is
-    var balances: BalanceArray in
-     -- Init balances
+    process BankAccountAPI [TRANSACTION: WSTransaction, SENDCONFIRM: WSConfirm] is
+        var balances: BalanceArray in
+            -- Init balances
             balances := BalanceArray(200 of Nat);
 
             loop
-                var uid: Nat in
-                    select
-                        var amount: Nat in
-                            DEPOSIT(?uid, ?amount);
-                            if (uid < 6) and (balances[uid] <= 235) then
-                                balances[uid] := balances[uid] + amount
-                            end if;
-                            SENDCONFIRMATION(uid, balances[uid])
-                        end var
-                    []
-                        var amount: Nat in
-                            WITHDRAW(?uid, ?amount);
-                            if (uid < 6) and (balances[uid] >= amount) then
-                                balances[uid] := balances[uid] - amount
-                            end if;
-                            SENDCONFIRMATION(uid, balances[uid])
-                        end var
-                    end select
+                var uid: Nat, amount: Nat, transactType: TransactionType in
+                    TRANSACTION(?uid, ?amount, ?transactType);
+                    if uid < 6 then
+                        if (transactType == Deposit) and (balances[uid] >= amount) then
+                            balances[uid] := balances[uid] - amount -- Deposite into WSAccount so withdraw from bank account
+                        elsif (transactType == Withdraw) and (balances[uid] <= 235) then
+                            balances[uid] := balances[uid] + amount -- Withdraw from WSAccount so deposit into bank account
+                        else
+                            amount := 0 -- Transaction invalid
+                        end if
+                    end if;
+                    SENDCONFIRM(uid, amount, transactType)
                 end var
             end loop
         end var
@@ -186,25 +187,27 @@ module WealthSimple with set, get is
                     DISPLAYBALANCE,
                     GETBALANCE: Uid,
                     SENDBALANCE: Balance,
-                    TRANSACTION: UTransaction,
+                    UTRANSACTION: UTransaction,
                     CHECKPRICE: Stock,
                     SENDPRICE: Price,
                     UTRADE: UTrade,
                     WSCHECKPRICE: WSPriceCheck,
                     WSSENDPRICE: WSPriceSend,
                     WSTRADE: WSTrade,
-                    CONFIRMTRADE: WSConfirmTrade
+                    CONFIRMTRADE: WSConfirmTrade,
+                    WSTRANSACTION: WSTransaction,
+                    WSCONFIRM: WSConfirm
                 ] is
         var u1: Nat in
             u1 := 1;
             par
-                GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> WSAccount [GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
+                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM]
                 ||
-                GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE] (u1)
+                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE] (u1)
                 ||
                 WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> StockMarketAPI[WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
                 ||
-                DEPOSIT, WITHDRAW -> BankAccountAPI[SENDCONFIRMATION, WITHDRAW, DEPOSIT]
+                WSTRANSACTION, WSCONFIRM -> BankAccountAPI[WSTRANSACTION, WSCONFIRM]
             end par
         end var
     end process
