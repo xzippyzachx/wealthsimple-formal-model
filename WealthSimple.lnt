@@ -1,15 +1,16 @@
 module WealthSimple with set, get is
 
     channel Uid is (id: Nat) end channel
-    channel Balance is (id: Nat, b: Nat) end channel
-    channel UTransaction is (id: Nat, a: Nat, t: TransactionType) end channel
-    channel Stock is (id: Nat, s: StockSymbol) end channel
-    channel Price is (id: Nat, s: StockSymbol, a: Nat) end channel
+    channel Balance is (id: Nat, balance: Nat) end channel
+    channel UTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel Stock is (id: Nat, symbol: StockSymbol) end channel
+    channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+    channel UTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
 
     channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
     channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
-    channel WSTrade is (id: Nat, symbol: StockSymbol, tradeType: TradeType) end channel
-    channel WSTradeConfirm is (id: Nat, symbol: StockSymbol, tradeType: TradeType) end channel
+    channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+    channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
 
     type StockSymbol is
         AAPL, NVDA, TSLA, AMZN
@@ -27,7 +28,7 @@ module WealthSimple with set, get is
         Buy, Sell with ==
     end type
 
-    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price] (ID: Nat) is
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade] (ID: Nat) is
         var disBalance: Nat, waiting: bool in
             disBalance := 0;
             waiting := false;
@@ -72,12 +73,21 @@ module WealthSimple with set, get is
                             waiting := false
                         end if
                     end var
+                []
+                    if waiting == false then
+                        var a: Nat, s: StockSymbol, t: TradeType in
+                            s := any StockSymbol;
+                            t := any TradeType;
+                            TRADE(ID, s, ?a, t) where (a == 5) or (a == 10) or (a == 20)
+                        end var;
+                        waiting := true
+                    end if
                 end select
             end loop
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade] is
         var balances: BalanceArray in
 
             -- Init balances
@@ -104,10 +114,19 @@ module WealthSimple with set, get is
                         var symbol: StockSymbol, price: Nat in
                             CHECKPRICE(?uid, ?symbol);
                             
-                            WSPRICECHECKING(uid, symbol);
-                            WSPRICESENDING(?uid, ?symbol, ?price);
+                            WSCHECKPRICE(uid, symbol);
+                            WSSENDPRICE(?uid, ?symbol, ?price);
 
                             SENDPRICE(uid, symbol, price)
+                        end var
+                    []
+                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType in
+                            UTRADE(?uid, ?symbol, ?amount, ?tradeType);
+                            
+                            WSTRADE(uid, symbol, amount, tradeType);
+                            WSCONFIRMTRADE(?uid, ?any StockSymbol, ?any Nat, ?any TradeType);
+
+                            SENDBALANCE(uid, balances[uid])
                         end var
                     end select
                 end var
@@ -116,40 +135,52 @@ module WealthSimple with set, get is
     end process
 
 
-    process StockMarketAPI [WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is 
+    process StockMarketAPI [WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade] is 
         loop
             select
                 -- Handles receiving and sending stock prices on Channel WSPrice
                 var id: Nat, symbo: StockSymbol, price: Nat in 
-                    WSPRICECHECKING(?id, ?symbo);
+                    WSCHECKPRICE(?id, ?symbo);
                     case symbo in
                             AAPL -> price := 20 of Nat
                         |   NVDA -> price := 15 of Nat
                         |   TSLA -> price := 10 of Nat
                         |   AMZN -> price := 5 of Nat
                     end case;
-                    WSPRICESENDING(id, symbo, price)
+                    WSSENDPRICE(id, symbo, price)
                 end var
-                []
+            []
                 --Handles Mock trade confirmations
-                var id: Nat, symbol: StockSymbol, tradeType: TradeType in 
-                    TRADE(?id, ?symbol, ?tradeType);
-                    CONFIRMTRADE(id, symbol, tradeType)
+                var id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType in 
+                    TRADE(?id, ?symbol, ?amount, ?tradeType);
+                    -- Mock confirmed...
+                    CONFIRMTRADE(id, symbol, amount, tradeType)
                 end var
             end select
         end loop
     end process
 
-    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, 
-                    WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is
+    process Main [
+                    DISPLAYBALANCE,
+                    GETBALANCE: Uid,
+                    SENDBALANCE: Balance,
+                    TRANSACTION: UTransaction,
+                    CHECKPRICE: Stock,
+                    SENDPRICE: Price,
+                    UTRADE: UTrade,
+                    WSCHECKPRICE: WSPriceCheck,
+                    WSSENDPRICE: WSPriceSend,
+                    WSTRADE: WSTrade,
+                    CONFIRMTRADE: WSConfirmTrade
+                ] is
         var u1: Nat in
             u1 := 1;
             par
-                GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, WSPRICECHECKING, WSPRICESENDING -> WSAccount [GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, WSPRICECHECKING, WSPRICESENDING]
+                GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> WSAccount [GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
                 ||
-                GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE] (u1)
+                GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, TRANSACTION, CHECKPRICE, SENDPRICE, UTRADE] (u1)
                 ||
-                WSPRICECHECKING, WSPRICESENDING -> StockMarketAPI[WSPRICECHECKING, WSPRICESENDING, TRADE, CONFIRMTRADE]
+                WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> StockMarketAPI[WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
             end par
         end var
     end process
