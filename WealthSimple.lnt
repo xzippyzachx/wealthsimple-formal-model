@@ -29,59 +29,52 @@ module WealthSimple with set, get is
     end type
 
     process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade] (ID: Nat) is
-        var disBalance: Nat, waiting: bool in
+        var disBalance: Nat in
             disBalance := 0;
-            waiting := false;
             loop
                 select
-                    if waiting == false then
-                        GETBALANCE(ID);
-                        waiting := true
+                    if disBalance != 0 then
+                        DISPLAYBALANCE(disBalance)
                     end if
                 []
+                    GETBALANCE(ID);
                     var uid: Nat, newBalance: Nat in
                         RECIVEBALANCE(?uid, ?newBalance);
                         if uid == ID then
-                            disBalance := newBalance;
-                            waiting := false
+                            disBalance := newBalance
                         end if
                     end var
                 []
-                    if (waiting == false) and (disBalance != 0) then
-                        DISPLAYBALANCE(disBalance) -- Temp proccess cuz I don't know how to display values. If we even can?
-                    end if
-                []
-                    if waiting == false then
-                        var a: Nat, t: TransactionType in
-                            t := any TransactionType;
-                            TRANSACTION(ID, ?a, t) where (a == 5) or (a == 10) or (a == 20)
-                        end var;
-                        waiting := true
-                    end if
-                []
-                    if (waiting == false) then
-                        var symbol: StockSymbol in
-                            symbol := any StockSymbol;
-                            CHECKPRICE(ID, symbol)
-                        end var;
-                        waiting := true
-                    end if
-                []
-                    var uid: Nat in -- , symbol: StockSymbol, price: Nat
-                        RECIVEPRICE(?uid, ?any StockSymbol, ?any Nat);
+                    var a: Nat, t: TransactionType in
+                        t := any TransactionType;
+                        TRANSACTION(ID, ?a, t) where (a == 5) or (a == 10) or (a == 20)
+                    end var;
+                    var uid: Nat, newBalance: Nat in
+                        RECIVEBALANCE(?uid, ?newBalance);
                         if uid == ID then
-                            waiting := false
+                            disBalance := newBalance
                         end if
                     end var
                 []
-                    if waiting == false then
-                        var a: Nat, s: StockSymbol, t: TradeType in
-                            s := any StockSymbol;
-                            t := any TradeType;
-                            TRADE(ID, s, ?a, t) where (a == 5) or (a == 10) or (a == 20)
-                        end var;
-                        waiting := true
-                    end if
+                    var symbol: StockSymbol in
+                        symbol := any StockSymbol;
+                        CHECKPRICE(ID, symbol)
+                    end var;
+                    --var uid: Nat in -- , symbol: StockSymbol, price: Nat
+                        RECIVEPRICE(?any Nat, ?any StockSymbol, ?any Nat)
+                    --end var
+                []
+                    var a: Nat, s: StockSymbol, t: TradeType in
+                        s := any StockSymbol;
+                        t := any TradeType;
+                        TRADE(ID, s, ?a, t) where (a == 5) or (a == 10) or (a == 20)
+                    end var;
+                    var uid: Nat, newBalance: Nat in
+                        RECIVEBALANCE(?uid, ?newBalance);
+                        if uid == ID then
+                            disBalance := newBalance
+                        end if
+                    end var
                 end select
             end loop
         end var
