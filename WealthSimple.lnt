@@ -7,6 +7,9 @@ module WealthSimple with set, get is
     channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
     channel UTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
 
+    channel PortfolioCheckRequest is (id: Nat, symbol: StockSymbol) end channel
+    channel PortfolioCheckResponse is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+
     channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
     channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
     channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
@@ -15,8 +18,9 @@ module WealthSimple with set, get is
     channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
     channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
 
+
     type StockSymbol is
-        AAPL, NVDA, TSLA, AMZN
+        AAPL, NVDA, TSLA, AMZN with ==
     end type
 
     type BalanceArray is
@@ -31,7 +35,17 @@ module WealthSimple with set, get is
         Buy, Sell with ==
     end type
 
-    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade] (ID: Nat) is
+    type Entry is Entry(symbol: StockSymbol, amount: Nat) end type
+
+    type Portfolio is 
+        array [1 .. 4] of Entry
+    end type
+
+    type Portfolios is 
+        array [1..2] of Portfolio
+    end type
+
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
         var disBalance: Nat in
             disBalance := 0;
             loop
@@ -78,16 +92,40 @@ module WealthSimple with set, get is
                             disBalance := newBalance
                         end if
                     end var
+                []
+                    var s: StockSymbol, uid: Nat, amount: Nat in 
+                        s := any StockSymbol;
+                        CheckPortfolio(ID, s);
+                        RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat)
+                    end var
                 end select
             end loop
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm] is
-        var balances: BalanceArray in
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] is
+        var balances: BalanceArray, allPortfolios: Portfolios in
 
             -- Init balances
             balances := BalanceArray(0 of Nat);
+
+            
+            allPortfolios := Portfolios(
+                Portfolio(
+                    Entry(AAPL, 0),
+                    Entry(NVDA, 0),
+                    Entry(TSLA, 0),
+                    Entry(AMZN, 0)
+                ),
+                Portfolio(
+                    Entry(AAPL, 0),
+                    Entry(NVDA, 0),
+                    Entry(TSLA, 0),
+                    Entry(AMZN, 0)
+                )
+            );
+
+
 
             loop
                 var uid: Nat in
@@ -120,13 +158,64 @@ module WealthSimple with set, get is
                             SENDPRICE(uid, symbol, price)
                         end var
                     []
+                        -- Handles Trading functionality
                         var symbol: StockSymbol, amount: Nat, tradeType: TradeType in
                             UTRADE(?uid, ?symbol, ?amount, ?tradeType);
                             
+                            var totalCost: Nat, stockPrice: Nat in
+                                -- Get price of stock and then calculate expected 
+                                WSCHECKPRICE(uid, symbol);
+                                WSSENDPRICE(?uid, ?symbol, ?stockPrice);
+                            
+                                totalCost := stockPrice * amount;
+
+                                if (tradeType == Buy) and (totalCost <= balances[uid]) then 
+                                    var I: Nat, currRec: Entry, newAmount: Nat, PortfolioArray: Portfolio in 
+                                        for I:=1 while I<=4 by I:=I+1 loop
+                                            currRec := allPortfolios[uid][I];
+                                            newAmount := currRec.amount + amount;
+                                            if currRec.symbol == symbol then 
+                                                PortfolioArray := allPortfolios[uid];
+                                                PortfolioArray[I] := PortfolioArray[I].{amount -> newAmount};
+                                                allPortfolios[uid] := PortfolioArray;
+                                                balances[uid] := balances[uid] - totalCost
+                                            end if
+                                        end loop
+                                    end var
+                                elsif tradeType == Sell then 
+                                    var I: Nat, currRec: Entry, newAmount: Nat, PortfolioArray: Portfolio in 
+                                        for I:=1 while I<=4 by I:=I+1 loop
+                                            currRec := allPortfolios[uid][I];
+                                            if (currRec.symbol == symbol) and (amount <= currRec.amount) then 
+                                                newAmount := currRec.amount - amount;
+                                                PortfolioArray := allPortfolios[uid];
+                                                PortfolioArray[I] := PortfolioArray[I].{amount -> newAmount};
+                                                allPortfolios[uid] := PortfolioArray;
+                                                balances[uid] := balances[uid] + totalCost
+                                            end if
+                                        end loop
+                                    end var
+                                end if
+                            end var;
                             WSTRADE(uid, symbol, amount, tradeType);
                             WSCONFIRMTRADE(?uid, ?any StockSymbol, ?any Nat, ?any TradeType);
 
                             SENDBALANCE(uid, balances[uid])
+                        end var
+                    []
+                        -- Handles user Portfolio check requests
+                        var uid: Nat, symbol: StockSymbol, amount: Nat in
+                            CHECKPORTFOLIO(?uid, ?symbol);
+                            amount := 0;
+                            var I: Nat, currRec: Entry in 
+                                for I:=1 while I<=4 by I:=I+1 loop
+                                    currRec := allPortfolios[uid][I];
+                                    if (currRec.symbol == symbol) then
+                                        amount := currRec.amount
+                                    end if
+                                end loop
+                            end var;
+                            RECEIVEPORTFOLIO(uid, symbol, amount)
                         end var
                     end select
                 end var
@@ -196,14 +285,16 @@ module WealthSimple with set, get is
                     WSTRADE: WSTrade,
                     CONFIRMTRADE: WSConfirmTrade,
                     WSTRANSACTION: WSTransaction,
-                    WSCONFIRM: WSConfirm
+                    WSCONFIRM: WSConfirm,
+                    CHECKPORTFOLIO: PortfolioCheckRequest,
+                    RECEIVEPORTFOLIO: PortfolioCheckResponse
                 ] is
         var u1: Nat in
             u1 := 1;
             par
-                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM]
+                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO]
                 ||
-                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE] (u1)
+                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (u1)
                 ||
                 WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> StockMarketAPI[WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
                 ||
