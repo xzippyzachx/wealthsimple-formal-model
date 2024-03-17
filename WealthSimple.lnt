@@ -78,15 +78,14 @@ module WealthSimple with set, get is
                         symbol := any StockSymbol;
                         CHECKPRICE(ID, symbol)
                     end var;
-                    --var uid: Nat in -- , symbol: StockSymbol, price: Nat
-                        RECIVEPRICE(?any Nat, ?any StockSymbol, ?any Nat)
-                    --end var
+                    RECIVEPRICE(?any Nat, ?any StockSymbol, ?any Nat)
                 []
                     var a: Nat, s: StockSymbol, t: TradeType in
                         s := any StockSymbol;
                         t := any TradeType;
-                        TRADE(ID, s, ?a, t) where (a == 1) or (a == 5)
+                        TRADE(ID, s, ?a, t) where (a == 1) or (a == 2)
                     end var;
+                    RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat);
                     var uid: Nat, newBalance: Nat in
                         RECIVEBALANCE(?uid, ?newBalance);
                         if uid == ID then
@@ -94,7 +93,7 @@ module WealthSimple with set, get is
                         end if
                     end var
                 []
-                    var s: StockSymbol, uid: Nat, amount: Nat in 
+                    var s: StockSymbol in 
                         s := any StockSymbol;
                         CheckPortfolio(ID, s);
                         RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat)
@@ -169,39 +168,31 @@ module WealthSimple with set, get is
                                 WSSENDPRICE(?uid, ?symbol, ?stockPrice);
                             
                                 totalCost := stockPrice * amount;
-
-                                if (tradeType == Buy) and (totalCost <= balances[uid]) then 
-                                    var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in 
-                                        for I:=1 while I<=4 by I:=I+1 loop
-                                            currRec := allPortfolios[uid][I];
-                                            if 255 - amount >= currRec.amount then
+                                var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in
+                                    for I:=1 while I<=4 by I:=I+1 loop L in
+                                        currRec := allPortfolios[uid][I];
+                                        newAmount := currRec.amount;
+                                        if currRec.symbol == symbol then
+                                            if (tradeType == Buy) and (totalCost <= balances[uid]) and (255 - amount >= currRec.amount) then
                                                 newAmount := currRec.amount + amount;
-                                                if currRec.symbol == symbol then 
-                                                    portfolioArray := allPortfolios[uid];
-                                                    portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
-                                                    allPortfolios[uid] := portfolioArray;
-                                                    balances[uid] := balances[uid] - totalCost
-                                                end if
-                                            end if
-                                        end loop
-                                    end var
-                                elsif (tradeType == Sell) and (255 - totalCost >= balances[uid]) then
-                                    var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in 
-                                        for I:=1 while I<=4 by I:=I+1 loop
-                                            currRec := allPortfolios[uid][I];
-                                            if (currRec.symbol == symbol) and (amount <= currRec.amount) then 
+                                                balances[uid] := balances[uid] - totalCost
+                                            elsif (tradeType == Sell) and (255 - totalCost >= balances[uid]) and (amount <= currRec.amount) then
                                                 newAmount := currRec.amount - amount;
-                                                portfolioArray := allPortfolios[uid];
-                                                portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
-                                                allPortfolios[uid] := portfolioArray;
                                                 balances[uid] := balances[uid] + totalCost
-                                            end if
-                                        end loop
-                                    end var
-                                end if
-                            end var;
+                                            end if;
 
-                            SENDBALANCE(uid, balances[uid])
+                                            portfolioArray := allPortfolios[uid];
+                                            portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
+                                            allPortfolios[uid] := portfolioArray;
+                                            currRec := allPortfolios[uid][I];
+
+                                            RECEIVEPORTFOLIO(uid, symbol, currRec.amount);
+                                            SENDBALANCE(uid, balances[uid]);
+                                            break L
+                                        end if
+                                    end loop
+                                end var
+                            end var
                         end var
                     []
                         -- Handles user Portfolio check requests
