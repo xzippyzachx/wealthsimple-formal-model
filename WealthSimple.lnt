@@ -18,13 +18,12 @@ module WealthSimple with set, get is
     channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
     channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
 
-
     type StockSymbol is
         AAPL, NVDA, TSLA, AMZN with ==
     end type
 
     type BalanceArray is
-        array [1 .. 5] of Nat
+        array [1 .. 2] of Nat
     end type
 
     type TransactionType is 
@@ -35,7 +34,9 @@ module WealthSimple with set, get is
         Buy, Sell with ==
     end type
 
-    type Entry is Entry(symbol: StockSymbol, amount: Nat) end type
+    type Entry is
+        Entry(symbol: StockSymbol, amount: Nat)
+    end type
 
     type Portfolio is 
         array [1 .. 4] of Entry
@@ -84,7 +85,7 @@ module WealthSimple with set, get is
                     var a: Nat, s: StockSymbol, t: TradeType in
                         s := any StockSymbol;
                         t := any TradeType;
-                        TRADE(ID, s, ?a, t) where (a == 5) or (a == 10) or (a == 20)
+                        TRADE(ID, s, ?a, t) where (a == 1) or (a == 5)
                     end var;
                     var uid: Nat, newBalance: Nat in
                         RECIVEBALANCE(?uid, ?newBalance);
@@ -108,7 +109,6 @@ module WealthSimple with set, get is
 
             -- Init balances
             balances := BalanceArray(0 of Nat);
-
             
             allPortfolios := Portfolios(
                 Portfolio(
@@ -125,8 +125,6 @@ module WealthSimple with set, get is
                 )
             );
 
-
-
             loop
                 var uid: Nat in
                     select
@@ -139,8 +137,8 @@ module WealthSimple with set, get is
                             WSTRANSACTION(uid, amount, transactType);
                             WSCONFIRM(?uid, ?amount, ?transactType);
 
-                            if uid < 6 then
-                                if (transactType == Deposit) and (balances[uid] <= 235) then
+                            if uid < 2 then
+                                if (transactType == Deposit) and (255 - amount >= balances[uid]) then
                                     balances[uid] := balances[uid] + amount
                                 elsif (transactType == Withdraw) and (balances[uid] >= amount) then
                                     balances[uid] := balances[uid] - amount
@@ -162,6 +160,9 @@ module WealthSimple with set, get is
                         var symbol: StockSymbol, amount: Nat, tradeType: TradeType in
                             UTRADE(?uid, ?symbol, ?amount, ?tradeType);
                             
+                            WSTRADE(uid, symbol, amount, tradeType);
+                            WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
+                            
                             var totalCost: Nat, stockPrice: Nat in
                                 -- Get price of stock and then calculate expected 
                                 WSCHECKPRICE(uid, symbol);
@@ -170,35 +171,35 @@ module WealthSimple with set, get is
                                 totalCost := stockPrice * amount;
 
                                 if (tradeType == Buy) and (totalCost <= balances[uid]) then 
-                                    var I: Nat, currRec: Entry, newAmount: Nat, PortfolioArray: Portfolio in 
+                                    var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in 
                                         for I:=1 while I<=4 by I:=I+1 loop
                                             currRec := allPortfolios[uid][I];
-                                            newAmount := currRec.amount + amount;
-                                            if currRec.symbol == symbol then 
-                                                PortfolioArray := allPortfolios[uid];
-                                                PortfolioArray[I] := PortfolioArray[I].{amount -> newAmount};
-                                                allPortfolios[uid] := PortfolioArray;
-                                                balances[uid] := balances[uid] - totalCost
+                                            if 255 - amount >= currRec.amount then
+                                                newAmount := currRec.amount + amount;
+                                                if currRec.symbol == symbol then 
+                                                    portfolioArray := allPortfolios[uid];
+                                                    portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
+                                                    allPortfolios[uid] := portfolioArray;
+                                                    balances[uid] := balances[uid] - totalCost
+                                                end if
                                             end if
                                         end loop
                                     end var
-                                elsif tradeType == Sell then 
-                                    var I: Nat, currRec: Entry, newAmount: Nat, PortfolioArray: Portfolio in 
+                                elsif (tradeType == Sell) and (255 - totalCost >= balances[uid]) then
+                                    var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in 
                                         for I:=1 while I<=4 by I:=I+1 loop
                                             currRec := allPortfolios[uid][I];
                                             if (currRec.symbol == symbol) and (amount <= currRec.amount) then 
                                                 newAmount := currRec.amount - amount;
-                                                PortfolioArray := allPortfolios[uid];
-                                                PortfolioArray[I] := PortfolioArray[I].{amount -> newAmount};
-                                                allPortfolios[uid] := PortfolioArray;
+                                                portfolioArray := allPortfolios[uid];
+                                                portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
+                                                allPortfolios[uid] := portfolioArray;
                                                 balances[uid] := balances[uid] + totalCost
                                             end if
                                         end loop
                                     end var
                                 end if
                             end var;
-                            WSTRADE(uid, symbol, amount, tradeType);
-                            WSCONFIRMTRADE(?uid, ?any StockSymbol, ?any Nat, ?any TradeType);
 
                             SENDBALANCE(uid, balances[uid])
                         end var
@@ -252,15 +253,15 @@ module WealthSimple with set, get is
     process BankAccountAPI [TRANSACTION: WSTransaction, SENDCONFIRM: WSConfirm] is
         var balances: BalanceArray in
             -- Init balances
-            balances := BalanceArray(200 of Nat);
+            balances := BalanceArray(255 of Nat);
 
             loop
                 var uid: Nat, amount: Nat, transactType: TransactionType in
                     TRANSACTION(?uid, ?amount, ?transactType);
-                    if uid < 6 then
+                    if uid <= 2 then
                         if (transactType == Deposit) and (balances[uid] >= amount) then
                             balances[uid] := balances[uid] - amount -- Deposite into WSAccount so withdraw from bank account
-                        elsif (transactType == Withdraw) and (balances[uid] <= 235) then
+                        elsif (transactType == Withdraw) and (255 - amount >= balances[uid]) then
                             balances[uid] := balances[uid] + amount -- Withdraw from WSAccount so deposit into bank account
                         else
                             amount := 0 -- Transaction invalid
