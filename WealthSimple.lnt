@@ -35,16 +35,13 @@ module WealthSimple with set, get is
     end type
 
     type Entry is
-        Entry(symbol: StockSymbol, amount: Nat)
+        Entry(uid: Nat, symbol: StockSymbol, amount: Nat)
     end type
 
     type Portfolio is 
-        array [1 .. 4] of Entry
+        array [1 .. 8] of Entry
     end type
 
-    type Portfolios is 
-        array [1..2] of Portfolio
-    end type
 
     process User [DISPLAYBALANCE, GETBALANCE: Uid, RECEIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
         var disBalance: Nat in
@@ -104,24 +101,20 @@ module WealthSimple with set, get is
     end process
 
     process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] is
-        var balances: BalanceArray, allPortfolios: Portfolios in
+        var balances: BalanceArray, portfolios: Portfolio in
 
             -- Init balances
             balances := BalanceArray(0 of Nat);
             
-            allPortfolios := Portfolios(
-                Portfolio(
-                    Entry(AAPL, 0),
-                    Entry(NVDA, 0),
-                    Entry(TSLA, 0),
-                    Entry(AMZN, 0)
-                ),
-                Portfolio(
-                    Entry(AAPL, 0),
-                    Entry(NVDA, 0),
-                    Entry(TSLA, 0),
-                    Entry(AMZN, 0)
-                )
+            portfolios := Portfolio(
+                Entry(1, AAPL, 0),
+                Entry(1, NVDA, 0),
+                Entry(1, TSLA, 0),
+                Entry(1, AMZN, 0),
+                Entry(2, AAPL, 0),
+                Entry(2, NVDA, 0),
+                Entry(2, TSLA, 0),
+                Entry(2, AMZN, 0)
             );
 
             loop
@@ -166,13 +159,13 @@ module WealthSimple with set, get is
                                 -- Get price of stock and then calculate expected 
                                 WSCHECKPRICE(uid, symbol);
                                 WSSENDPRICE(?uid, ?symbol, ?stockPrice);
-                            
+                                
                                 totalCost := stockPrice * amount;
                                 var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in
-                                    for I:=1 while I<=4 by I:=I+1 loop L in
-                                        currRec := allPortfolios[uid][I];
+                                    for I:=1 while I<=8 by I:=I+1 loop L in
+                                        currRec := portfolios[I];
                                         newAmount := currRec.amount;
-                                        if currRec.symbol == symbol then
+                                        if (currRec.uid == uid) and (currRec.symbol == symbol) then
                                             if (tradeType == Buy) and (totalCost <= balances[uid]) and (255 - amount >= currRec.amount) then
                                                 newAmount := currRec.amount + amount;
                                                 balances[uid] := balances[uid] - totalCost
@@ -181,12 +174,9 @@ module WealthSimple with set, get is
                                                 balances[uid] := balances[uid] + totalCost
                                             end if;
 
-                                            portfolioArray := allPortfolios[uid];
-                                            portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
-                                            --allPortfolios[uid] := portfolioArray;
-                                            currRec := allPortfolios[uid][I];
+                                            portfolios[I] := portfolios[I].{amount -> newAmount};
 
-                                            RECEIVEPORTFOLIO(uid, symbol, currRec.amount);
+                                            RECEIVEPORTFOLIO(uid, symbol, newAmount);
                                             SENDBALANCE(uid, balances[uid]);
                                             break L
                                         end if
@@ -200,9 +190,9 @@ module WealthSimple with set, get is
                             CHECKPORTFOLIO(?uid, ?symbol);
                             amount := 0;
                             var I: Nat, currRec: Entry in 
-                                for I:=1 while I<=4 by I:=I+1 loop
-                                    currRec := allPortfolios[uid][I];
-                                    if (currRec.symbol == symbol) then
+                                for I:=1 while I<=8 by I:=I+1 loop
+                                    currRec := portfolios[I];
+                                    if (currRec.uid == uid) and (currRec.symbol == symbol) then
                                         amount := currRec.amount
                                     end if
                                 end loop
