@@ -149,17 +149,31 @@ module WealthSimple with set, get is
                         end var
                     []
                         -- Handles Trading functionality
-                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType in
+                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType, mainUID: Nat in
                             UTRADE(?uid, ?symbol, ?amount, ?tradeType);
                             
+                            mainUID := uid;
+
                             WSTRADE(uid, symbol, amount, tradeType);
-                            WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
-                            
+
+                            loop L in
+                                WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
+                                if (uid == mainUID) then 
+                                    break L
+                                end if
+                            end loop;
+
                             var totalCost: Nat, stockPrice: Nat in
                                 -- Get price of stock and then calculate expected 
                                 WSCHECKPRICE(uid, symbol);
-                                WSSENDPRICE(?uid, ?symbol, ?stockPrice);
-                                
+
+                                loop L in
+                                    WSSENDPRICE(?uid, ?symbol, ?stockPrice);
+                                    if (uid == mainUID) then
+                                        break L
+                                    end if
+                                end loop;
+
                                 totalCost := stockPrice * amount;
                                 var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in
                                     for I:=1 while I<=8 by I:=I+1 loop L in
