@@ -46,7 +46,7 @@ module WealthSimple with set, get is
         array [1..2] of Portfolio
     end type
 
-    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECEIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
         var disBalance: Nat in
             disBalance := 0;
             loop
@@ -57,7 +57,7 @@ module WealthSimple with set, get is
                 []
                     GETBALANCE(ID);
                     var uid: Nat, newBalance: Nat in
-                        RECIVEBALANCE(?uid, ?newBalance);
+                        RECEIVEBALANCE(?uid, ?newBalance);
                         if uid == ID then
                             disBalance := newBalance
                         end if
@@ -68,7 +68,7 @@ module WealthSimple with set, get is
                         TRANSACTION(ID, ?a, t) where (a == 5) or (a == 10) or (a == 20)
                     end var;
                     var uid: Nat, newBalance: Nat in
-                        RECIVEBALANCE(?uid, ?newBalance);
+                        RECEIVEBALANCE(?uid, ?newBalance);
                         if uid == ID then
                             disBalance := newBalance
                         end if
@@ -87,7 +87,7 @@ module WealthSimple with set, get is
                     end var;
                     RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat);
                     var uid: Nat, newBalance: Nat in
-                        RECIVEBALANCE(?uid, ?newBalance);
+                        RECEIVEBALANCE(?uid, ?newBalance);
                         if uid == ID then
                             disBalance := newBalance
                         end if
@@ -183,7 +183,7 @@ module WealthSimple with set, get is
 
                                             portfolioArray := allPortfolios[uid];
                                             portfolioArray[I] := portfolioArray[I].{amount -> newAmount};
-                                            allPortfolios[uid] := portfolioArray;
+                                            --allPortfolios[uid] := portfolioArray;
                                             currRec := allPortfolios[uid][I];
 
                                             RECEIVEPORTFOLIO(uid, symbol, currRec.amount);

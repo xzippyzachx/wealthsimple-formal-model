@@ -8,3 +8,5 @@ ocis
 *.f
 *.h.BAK
 *.c
+*.log
+.nfs*

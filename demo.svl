@@ -1,0 +1,11 @@
+"WealthSimple.bcg" = generation of "WealthSimple.lnt";
+
+property PROPERTY_1
+	"Get and receive balance"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	SOME({GETBALANCE...}.{SENDBALANCE...});
+	expected TRUE;
+end property
