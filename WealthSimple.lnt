@@ -1,23 +1,8 @@
 module WealthSimple with set, get is
 
-    channel Uid is (id: Nat) end channel
-    channel Balance is (id: Nat, balance: Nat) end channel
-    channel UTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
-    channel Stock is (id: Nat, symbol: StockSymbol) end channel
-    channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
-    channel UTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
-
-    channel PortfolioCheckRequest is (id: Nat, symbol: StockSymbol) end channel
-    channel PortfolioCheckResponse is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
-
-    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
-    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
-    channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
-    channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
-
-    channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
-    channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
-
+    ------------------------------------------------------------------------
+    --  Types
+    ------------------------------------------------------------------------
     type StockSymbol is
         AAPL, NVDA, TSLA, AMZN with ==
     end type
@@ -42,6 +27,32 @@ module WealthSimple with set, get is
         array [1 .. 8] of Entry
     end type
 
+    ------------------------------------------------------------------------
+    --  Channels
+    ------------------------------------------------------------------------
+
+    channel Uid is (id: Nat) end channel
+    channel Balance is (id: Nat, balance: Nat) end channel
+    channel UTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel Stock is (id: Nat, symbol: StockSymbol) end channel
+    channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+    channel UTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+
+    channel PortfolioCheckRequest is (id: Nat, symbol: StockSymbol) end channel
+    channel PortfolioCheckResponse is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+
+    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
+    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
+    channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+    channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+
+    channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+
+    
+    ------------------------------------------------------------------------
+    --  Processes
+    ------------------------------------------------------------------------
 
     process User [DISPLAYBALANCE, GETBALANCE: Uid, RECEIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
         var disBalance: Nat in
