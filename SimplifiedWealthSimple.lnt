@@ -1,22 +1,8 @@
 module SimplifiedWealthSimple with set, get is
 
-    channel Uid is (id: Nat) end channel
-    channel Balance is (id: Nat, balance: Nat) end channel
-    channel UTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
-    channel Stock is (id: Nat, symbol: StockSymbol) end channel
-    channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
-    channel UTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
-
-    channel PortfolioCheckRequest is (id: Nat, symbol: StockSymbol) end channel
-    channel PortfolioCheckResponse is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
-
-    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
-    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
-    channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
-    channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
-
-    channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
-    channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    ------------------------------------------------------------------------
+    --  Types
+    ------------------------------------------------------------------------
 
     type StockSymbol is
         AAPL, NVDA, TSLA, AMZN with ==
@@ -42,6 +28,31 @@ module SimplifiedWealthSimple with set, get is
         array [1 .. 8] of Entry
     end type
 
+    ------------------------------------------------------------------------
+    --  Channels
+    ------------------------------------------------------------------------
+
+    channel Uid is (id: Nat) end channel
+    channel Balance is (id: Nat, balance: Nat) end channel
+    channel UTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel Stock is (id: Nat, symbol: StockSymbol) end channel
+    channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+    channel UTrade is (id: Nat, symbol: StockSymbol, tradeType: TradeType) end channel
+
+    channel PortfolioCheckRequest is (id: Nat, symbol: StockSymbol) end channel
+    channel PortfolioCheckResponse is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+
+    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
+    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
+    channel WSTrade is (id: Nat, symbol: StockSymbol, tradeType: TradeType) end channel
+    channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, tradeType: TradeType) end channel
+
+    channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+
+    ------------------------------------------------------------------------
+    --  Processes
+    ------------------------------------------------------------------------
 
     process User [DISPLAYBALANCE, GETBALANCE: Uid, RECEIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
         var disBalance: Nat in
@@ -80,7 +91,7 @@ module SimplifiedWealthSimple with set, get is
                     var a: Nat, s: StockSymbol, t: TradeType in
                         s := any StockSymbol;
                         t := any TradeType;
-                        TRADE(ID, s, ?a, t) where (a == 1)
+                        TRADE(ID, s, t)
                     end var;
                     RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat);
                     var uid: Nat, newBalance: Nat in
@@ -149,43 +160,42 @@ module SimplifiedWealthSimple with set, get is
                         end var
                     []
                         -- Handles Trading functionality
-                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType, mainUID: Nat in
-                            UTRADE(?uid, ?symbol, ?amount, ?tradeType);
+                        var symbol: StockSymbol, tradeType: TradeType, mainUID: Nat in
+                            UTRADE(?uid, ?symbol, ?tradeType);
                             
                             mainUID := uid;
 
-                            WSTRADE(uid, symbol, amount, tradeType);
+                            WSTRADE(uid, symbol, tradeType);
 
                             loop L in
-                                WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
+                                WSCONFIRMTRADE(?uid, ?symbol, ?tradeType);
                                 if (uid == mainUID) then 
                                     break L
                                 end if
                             end loop;
 
-                            var totalCost: Nat, stockPrice: Nat in
+                            var cost: Nat in
                                 -- Get price of stock and then calculate expected 
                                 WSCHECKPRICE(uid, symbol);
 
                                 loop L in
-                                    WSSENDPRICE(?uid, ?symbol, ?stockPrice);
+                                    WSSENDPRICE(?uid, ?symbol, ?cost);
                                     if (uid == mainUID) then
                                         break L
                                     end if
                                 end loop;
 
-                                totalCost := stockPrice * amount;
                                 var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in
                                     for I:=1 while I<=8 by I:=I+1 loop L in
                                         currRec := portfolios[I];
                                         newAmount := currRec.amount;
                                         if (currRec.uid == uid) and (currRec.symbol == symbol) then
-                                            if (tradeType == Buy) and (currRec.amount == 0) and (totalCost <= balances[uid]) and (255 - amount >= currRec.amount) then
-                                                newAmount := currRec.amount + amount;
-                                                balances[uid] := balances[uid] - totalCost
-                                            elsif (tradeType == Sell) and (255 - totalCost >= balances[uid]) and (amount <= currRec.amount) then
-                                                newAmount := currRec.amount - amount;
-                                                balances[uid] := balances[uid] + totalCost
+                                            if (tradeType == Buy) and (currRec.amount < 1) and (cost <= balances[uid]) then
+                                                newAmount := currRec.amount + 1;
+                                                balances[uid] := balances[uid] - cost
+                                            elsif (tradeType == Sell) and (255 - cost >= balances[uid]) and (currRec.amount > 0) then
+                                                newAmount := currRec.amount - 1;
+                                                balances[uid] := balances[uid] + cost
                                             end if;
 
                                             portfolios[I] := portfolios[I].{amount -> newAmount};
@@ -236,10 +246,10 @@ module SimplifiedWealthSimple with set, get is
                 end var
             []
                 --Handles Mock trade confirmations
-                var id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType in 
-                    TRADE(?id, ?symbol, ?amount, ?tradeType);
+                var id: Nat, symbol: StockSymbol, tradeType: TradeType in 
+                    TRADE(?id, ?symbol, ?tradeType);
                     -- Mock confirmed...
-                    CONFIRMTRADE(id, symbol, amount, tradeType)
+                    CONFIRMTRADE(id, symbol, tradeType)
                 end var
             end select
         end loop
