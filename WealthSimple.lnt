@@ -91,7 +91,7 @@ module WealthSimple with set, get is
                     var a: Nat, s: StockSymbol, t: TradeType in
                         s := any StockSymbol;
                         t := any TradeType;
-                        TRADE(ID, s, ?a, t) where (a == 1) or (a == 2)
+                        TRADE(ID, s, ?a, t) where (a == 1)
                     end var;
                     RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat);
                     var uid: Nat, newBalance: Nat in
@@ -111,7 +111,7 @@ module WealthSimple with set, get is
         end var
     end process
 
-    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] is
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (maxStock: Nat) is
         var balances: BalanceArray, portfolios: Portfolio in
 
             -- Init balances
@@ -186,12 +186,12 @@ module WealthSimple with set, get is
                                 end loop;
 
                                 totalCost := stockPrice * amount;
-                                var I: Nat, currRec: Entry, newAmount: Nat, portfolioArray: Portfolio in
+                                var I: Nat, currRec: Entry, newAmount: Nat in
                                     for I:=1 while I<=8 by I:=I+1 loop L in
                                         currRec := portfolios[I];
                                         newAmount := currRec.amount;
                                         if (currRec.uid == uid) and (currRec.symbol == symbol) then
-                                            if (tradeType == Buy) and (totalCost <= balances[uid]) and (255 - amount >= currRec.amount) then
+                                            if (tradeType == Buy) and (totalCost <= balances[uid]) and (maxStock - amount >= currRec.amount) then
                                                 newAmount := currRec.amount + amount;
                                                 balances[uid] := balances[uid] - totalCost
                                             elsif (tradeType == Sell) and (255 - totalCost >= balances[uid]) and (amount <= currRec.amount) then
@@ -295,14 +295,15 @@ module WealthSimple with set, get is
                     -- WSCONFIRM: WSConfirm,
                     CHECKPORTFOLIO: PortfolioCheckRequest,
                     RECEIVEPORTFOLIO: PortfolioCheckResponse
-                ] is
+                ]
+                (maxStock: Nat) is
 
         var u1: Nat in
             u1 := 1;
 
             hide WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm in
                 par
-                    GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO]
+                    GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (maxStock)
                     ||
                     GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (u1)
                     ||

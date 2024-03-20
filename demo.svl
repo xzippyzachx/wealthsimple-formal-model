@@ -1,4 +1,15 @@
-"WealthSimple.bcg" = generation of "WealthSimple.lnt";
+
+"WealthSimple.bcg" = generation of "WealthSimple.lnt":"Main(1)";
+
+(**)
+property PROPERTY_0
+	"Deadlock free"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	[true*] <true> true;
+	expected TRUE;
+end property
 
 property PROPERTY_1
 	"Get and receive balance"
