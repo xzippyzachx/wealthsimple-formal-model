@@ -140,7 +140,7 @@ module WealthSimple with set, get is
                             WSTRANSACTION(uid, amount, transactType);
                             WSCONFIRM(?uid, ?amount, ?transactType);
 
-                            if uid < 2 then
+                            if uid <= 2 then
                                 if (transactType == Deposit) and (255 - amount >= balances[uid]) then
                                     balances[uid] := balances[uid] + amount
                                 elsif (transactType == Withdraw) and (balances[uid] >= amount) then
@@ -160,30 +160,16 @@ module WealthSimple with set, get is
                         end var
                     []
                         -- Handles Trading functionality
-                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType, mainUID: Nat in
+                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType in
                             UTRADE(?uid, ?symbol, ?amount, ?tradeType);
                             
-                            mainUID := uid;
-
                             WSTRADE(uid, symbol, amount, tradeType);
-
-                            loop L in
-                                WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
-                                if (uid == mainUID) then 
-                                    break L
-                                end if
-                            end loop;
+                            WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
 
                             var totalCost: Nat, stockPrice: Nat in
                                 -- Get price of stock and then calculate expected 
                                 WSCHECKPRICE(uid, symbol);
-
-                                loop L in
-                                    WSSENDPRICE(?uid, ?symbol, ?stockPrice);
-                                    if (uid == mainUID) then
-                                        break L
-                                    end if
-                                end loop;
+                                WSSENDPRICE(?uid, ?symbol, ?stockPrice);
 
                                 totalCost := stockPrice * amount;
                                 var I: Nat, currRec: Entry, newAmount: Nat in
@@ -298,14 +284,19 @@ module WealthSimple with set, get is
                 ]
                 (maxStock: Nat) is
 
-        var u1: Nat in
+        var u1: Nat, u2: Nat in
             u1 := 1;
+            u2 := 2;
 
             hide WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm in
                 par
                     GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (maxStock)
                     ||
-                    GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (u1)
+                    GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> par
+                        User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (u1)
+                        ||
+                        User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (u2)
+                    end par
                     ||
                     WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> StockMarketAPI[WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
                     ||
