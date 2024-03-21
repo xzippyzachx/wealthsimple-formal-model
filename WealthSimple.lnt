@@ -51,7 +51,20 @@ module WealthSimple with set, get is
     channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
     channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
 
+    ------------------------------------------------------------------------
+    --  Functions
+    ------------------------------------------------------------------------
     
+    function GetStockIndex (symbol: StockSymbol) : Nat is
+        var stockIndex: Nat in
+            case symbol in
+                    AAPL -> stockIndex := 1 of Nat
+                |   NVDA -> stockIndex := 2 of Nat
+            end case;
+            return stockIndex
+        end var
+    end function
+
     ------------------------------------------------------------------------
     --  Processes
     ------------------------------------------------------------------------
@@ -70,7 +83,7 @@ module WealthSimple with set, get is
             []
                 var a: Nat, t: TransactionType in
                     t := any TransactionType;
-                    TRANSACTION(ID, ?a, t) where (a == 1)
+                    TRANSACTION(ID, ?a, t) where (a == 1) or (a == 5)
                 end var;
                 var uid: Nat, newBalance: Nat in
                     RECEIVEBALANCE(?uid, ?newBalance);
@@ -167,11 +180,8 @@ module WealthSimple with set, get is
                                     
                                     if uid <= 2 then
                                         stockPortfolio := portfolios[uid];
+                                        stockIndex := GetStockIndex(symbol);
 
-                                        case symbol in
-                                                AAPL -> stockIndex := 1 of Nat
-                                            |   NVDA -> stockIndex := 2 of Nat
-                                        end case;
                                         currAmount := stockPortfolio[stockIndex];
 
                                         if (tradeType == Buy) and (totalCost <= balances[uid]) and (maxStock - amount >= currAmount) then
@@ -198,10 +208,7 @@ module WealthSimple with set, get is
                             amount := 0;
 
                             if uid <= 2 then
-                                case symbol in
-                                        AAPL -> stockIndex := 1 of Nat
-                                    |   NVDA -> stockIndex := 2 of Nat
-                                end case;
+                                stockIndex := GetStockIndex(symbol);
 
                                 amount := portfolios[uid][stockIndex]
                             end if;
@@ -219,13 +226,13 @@ module WealthSimple with set, get is
         loop
             select
                 -- Handles receiving and sending stock prices on Channel WSPrice
-                var id: Nat, symbo: StockSymbol, price: Nat in 
-                    WSCHECKPRICE(?id, ?symbo);
-                    case symbo in
+                var id: Nat, symbol: StockSymbol, price: Nat in 
+                    WSCHECKPRICE(?id, ?symbol);
+                    case symbol in
                             AAPL -> price := 2 of Nat
                         |   NVDA -> price := 1 of Nat
                     end case;
-                    WSSENDPRICE(id, symbo, price)
+                    WSSENDPRICE(id, symbol, price)
                 end var
             []
                 --Handles Mock trade confirmations
