@@ -1,4 +1,4 @@
-module SimplifiedWealthSimple with set, get is
+module WealthSimple with set, get is
 
     ------------------------------------------------------------------------
     --  Types
