@@ -20,13 +20,13 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_3
+property PROPERTY_a1
 	"Only user transaction and user trades can affect the user balance"
 is
 	"WealthSimple.bcg"
     |= with evaluator4
 	library standard.mcl end_library
-	NEVER(true*.
+	NEVER(
 	{SENDBALANCE(?id:Nat ?amount:Nat)}.
 	(not {UTRANSACTION...} and not {UTRADE...})*.
 	{SENDBALANCE(!id ?amount2:Nat) where (amount2 <> amount)}
@@ -34,6 +34,39 @@ is
 	expected TRUE;
 end property
 
+property PROPERTY_a2
+	"BankAccountAPI cannot confirm a transaction before it is requested by the user, then processed by the bank"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NOT_1_TO_2_UNLESS_3 ({UTRANSACTION...}, {WSCONFIRM...}, {WSTRANSACTION...});
+	expected TRUE;
+end property
 
+property PROPERTY_a3
+	"BankAccountAPI transactions and confirmations alternate"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	ALTERNATE_1_THEN_2 ({WSTRANSACTION...}, {WSCONFIRM...});
+	expected TRUE;
+end property
+
+property PROPERTY_a4
+	"A user cannot withdraw more than they have as available cash in their WealthSimple account"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NEVER(
+	{SENDBALANCE(?id:Nat ?amount:Nat)}.
+	(not {UTRANSACTION(!id ?depositAmount:Nat ?transactType:String) where (transactType="Deposit")} 
+    and not {UTRADE...})*.
+	{WSCONFIRM(!id ?amount2:Nat ?transactConfirm:String) where (amount2 > amount)}
+	);
+	expected TRUE;
+end property
 
 	
