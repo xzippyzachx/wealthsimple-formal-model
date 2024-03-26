@@ -48,5 +48,23 @@ is
     |= with evaluator4
 	library standard.mcl end_library
 	SOME(true*.{CONFIRMTRADE...}.{WSCHECKPRICE...});
+	expected TRUE; (*Fails right now*)
+end property
+
+property PROPERTY_a1
+	"Only user transaction and user trades can affect the user balance"
+is 
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NEVER(true*.
+	{SENDBALANCE(?id:Nat ?amount:Nat)}.
+	(not {UTRANSACTION...} and not {UTRADE...})*.
+	{SENDBALANCE(!id ?amount2:Nat) where (amount2 <> amount)}
+	);
 	expected TRUE;
 end property
+
+
+
+	
