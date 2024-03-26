@@ -2,7 +2,7 @@
 "WealthSimple.bcg" = generation of "WealthSimple.lnt":"Main(1, 5)";
 
 (**)
-property PROPERTY_0
+property PROPERTY_deadlock
 	"Deadlock free"
 is
     "WealthSimple.bcg"
@@ -11,12 +11,42 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_1
-	"Get and receive balance"
+property PROPERTY_safety_z1
+	"WSSENDPRICE requires WSCHECKPRICE"
 is
-    "WealthSimple.bcg"
+	"WealthSimple.bcg"
     |= with evaluator4
 	library standard.mcl end_library
-	SOME({GETBALANCE...}.{SENDBALANCE...});
+	NEVER({WSSENDPRICE ...}.{WSCHECKPRICE ...});
+	expected TRUE;
+end property
+
+property PROPERTY_safety_z2
+	"SENDPRICE requires CHECKPRICE"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NEVER({SENDPRICE ...}.{CHECKPRICE ...});
+	expected TRUE;
+end property
+
+property PROPERTY_z3
+	"CHECKPRICE results in SENDPRICE"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	SOME({CHECKPRICE...}.true*.{SENDPRICE...});
+	expected TRUE;
+end property
+
+property PROPERTY_z4
+	"CONFIRMTRADE results in WSCHECKPRICE"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	SOME(true*.{CONFIRMTRADE...}.{WSCHECKPRICE...});
 	expected TRUE;
 end property
