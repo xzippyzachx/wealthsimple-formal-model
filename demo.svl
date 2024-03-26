@@ -1,4 +1,3 @@
-
 "WealthSimple.bcg" = generation of "WealthSimple.lnt":"Main(1, 5)";
 
 (**)
@@ -20,3 +19,21 @@ is
 	SOME({GETBALANCE...}.{SENDBALANCE...});
 	expected TRUE;
 end property
+
+property PROPERTY_3
+	"Only user transaction and user trades can affect the user balance"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NEVER(true*.
+	{SENDBALANCE(?id:Nat ?amount:Nat)}.
+	(not {UTRANSACTION...} and not {UTRADE...})*.
+	{SENDBALANCE(!id ?amount2:Nat) where (amount2 <> amount)}
+	);
+	expected TRUE;
+end property
+
+
+
+	
