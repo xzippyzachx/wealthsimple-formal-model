@@ -11,6 +11,74 @@ is
 	expected TRUE;
 end property
 
+property Property_liveness_w1
+	"Trading a stock will involve communication with the stockMarketAPI to check stock prices, and to confirm trades. As well as other events such as balance sending."
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	SOME(
+            {UTRADE...}.
+            {WSTRADE...}.
+            {CONFIRMTRADE...}.
+            {WSCHECKPRICE...}.
+            {WSSENDPRICE...}.
+            {RECEIVEPORTFOLIO...}.
+            {SENDBALANCE...}
+		);
+	expected TRUE;
+end property
+
+property Property_safety_w2
+	"A stock market API will never confirm a trade that wasn't requested"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NOT_1_BEFORE_2({WSCONFIRMTRADE...}, {WSTRADE...});
+	expected TRUE;
+end property
+
+property Property_liveness_w3
+	"A stock market API will always confirm a trade after receiving it"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_INEVITABLE_2({WSTRADE...}, {WSCONFIRMTRADE...});
+	expected TRUE;
+end property
+
+property Property_fairness_w4
+	"After performing a trade, the user can check the status of their portfolio"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_FAIRLY_2({UTRADE...}, {CHECKPORTFOLIO...});
+	expected TRUE;
+end property
+
+property Property_safety_w5_safety
+	"A request to check portfolio will always be met with an immediate response"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_INEVITABLE_2({CHECKPORTFOLIO...}, {RECEIVEPORTFOLIO...});
+	expected TRUE;
+end property
+
+property Property_fairness_w6
+	"After performing a trade, the user can check their balance"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_FAIRLY_2({UTRADE...}, {SENDBALANCE...});
+	expected TRUE;
+end property
+
 property PROPERTY_safety_z1
 	"WSSENDPRICE requires WSCHECKPRICE"
 is
