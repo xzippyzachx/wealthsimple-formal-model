@@ -11,6 +11,7 @@ is
 	expected TRUE;
 end property
 
+
 property Property_liveness_w1
 	"Trading a stock will involve communication with the stockMarketAPI to check stock prices, and to confirm trades. As well as other events such as balance sending."
 is
@@ -167,6 +168,49 @@ is
     and not {UTRADE...})*.
 	{WSCONFIRM(!id ?amount2:Nat ?transactConfirm:String) where (amount2 > amount)}
 	);
+	expected TRUE;
+end property
+
+property PROPERTY_a5
+	"WealthSimple balance is a correctly updated after bank deposits"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NEVER(
+	{SENDBALANCE(?id:Nat ?originalBalance:Nat)}.
+    (not {UTRADE...} and not {UTRANSACTION...})*.
+	{UTRANSACTION(!id ?depositAmount:Nat ?transactType:String) where (transactType="Deposit")}.
+	(not {UTRADE...} and not {UTRANSACTION...})*.
+	{SENDBALANCE(!id ?newBalance:Nat) where (originalBalance + depositAmount) <> newBalance}
+	);
+	expected TRUE;
+end property
+
+property PROPERTY_a6
+	"WealthSimple balance is a correctly updated after bank withdrawal"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NEVER(
+	{SENDBALANCE(?id:Nat ?originalBalance:Nat)}.
+    (not {UTRADE...} and not {UTRANSACTION...})*.
+	{UTRANSACTION(!id ?depositAmount:Nat ?transactType:String) where (transactType="Withdraw")}.
+	(not {UTRADE...} and not {UTRANSACTION...})*.
+	{SENDBALANCE(!id ?newBalance:Nat) where (originalBalance - depositAmount) <> newBalance}
+	);
+	expected TRUE;
+end property
+
+
+property PROPERTY_a7
+	"GETBALANCE results in SENDBALANCE"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	SOME({GETBALANCE...}.true*.{SENDBALANCE...});
 	expected TRUE;
 end property
 
