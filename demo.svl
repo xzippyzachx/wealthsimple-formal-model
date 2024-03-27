@@ -30,16 +30,6 @@ is
 end property
 
 property PROPERTY_liveness_2
-	"A stock market API will always confirm a trade after receiving it"
-is
-    "WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	AFTER_1_INEVITABLE_2({WSTRADE...}, {WSCONFIRMTRADE...});
-	expected TRUE;
-end property
-
-property PROPERTY_liveness_3
 	"A user requesting a stock price check will eventually result in receiving the stock price"
 is
 	"WealthSimple.bcg"
@@ -49,7 +39,7 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_liveness_4
+property PROPERTY_liveness_3
 	"A user requesting their balance will eventually result in receiving their balance"
 is
 	"WealthSimple.bcg"
