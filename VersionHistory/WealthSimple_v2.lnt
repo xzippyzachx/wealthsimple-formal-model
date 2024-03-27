@@ -1,0 +1,306 @@
+module WealthSimple with set, get is
+
+    ------------------------------------------------------------------------
+    --  Types
+    ------------------------------------------------------------------------
+    type StockSymbol is
+        AAPL,
+        NVDA
+        with ==
+    end type
+
+    type BalanceArray is
+        array [1 .. 2] of Nat
+    end type
+
+    type TransactionType is
+        Deposit, Withdraw with ==
+    end type
+
+    type TradeType is 
+        Buy, Sell with ==
+    end type
+
+    type PortfolioStocks is
+        array [1 .. 2] of Nat
+    end type
+
+    type PortfolioUsers is
+        array [1 .. 2] of PortfolioStocks
+    end type
+
+    ------------------------------------------------------------------------
+    --  Channels
+    ------------------------------------------------------------------------
+
+    channel Uid is (id: Nat) end channel
+    channel Balance is (id: Nat, balance: Nat) end channel
+    channel UTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel Stock is (id: Nat, symbol: StockSymbol) end channel
+    channel Price is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+    channel UTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+
+    channel PortfolioCheckRequest is (id: Nat, symbol: StockSymbol) end channel
+    channel PortfolioCheckResponse is (id: Nat, symbol: StockSymbol, amount: Nat) end channel
+
+    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
+    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
+    channel WSTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+    channel WSConfirmTrade is (id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType) end channel
+
+    channel WSTransaction is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+    channel WSConfirm is (id: Nat, amount: Nat, transactType: TransactionType) end channel
+
+    ------------------------------------------------------------------------
+    --  Functions
+    ------------------------------------------------------------------------
+    
+    function GetStockIndex (symbol: StockSymbol) : Nat is
+        var stockIndex: Nat in
+            case symbol in
+                    AAPL -> stockIndex := 1 of Nat
+                |   NVDA -> stockIndex := 2 of Nat
+            end case;
+            return stockIndex
+        end var
+    end function
+
+    ------------------------------------------------------------------------
+    --  Processes
+    ------------------------------------------------------------------------
+
+    process User [GETBALANCE: Uid, RECEIVEBALANCE: Balance, TRANSACTION: UTransaction, CHECKPRICE: Stock, RECIVEPRICE: Price, TRADE: UTrade, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (ID: Nat) is
+        
+        loop
+            select
+                GETBALANCE(ID);
+                var uid: Nat, newBalance: Nat in
+                    RECEIVEBALANCE(?uid, ?newBalance);
+                    if uid == ID then
+                        use newBalance
+                    end if
+                end var
+            []
+                var a: Nat, t: TransactionType in
+                    t := any TransactionType;
+                    TRANSACTION(ID, ?a, t) where (a == 1) or (a == 5)
+                end var;
+                var uid: Nat, newBalance: Nat in
+                    RECEIVEBALANCE(?uid, ?newBalance);
+                    if uid == ID then
+                        use newBalance
+                    end if
+                end var
+            []
+                var symbol: StockSymbol in
+                    symbol := any StockSymbol;
+                    CHECKPRICE(ID, symbol)
+                end var;
+                RECIVEPRICE(?any Nat, ?any StockSymbol, ?any Nat)
+            []
+                var a: Nat, s: StockSymbol, t: TradeType in
+                    s := any StockSymbol;
+                    t := any TradeType;
+                    TRADE(ID, s, ?a, t) where (a == 1)
+                end var;
+                RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat);
+                var uid: Nat, newBalance: Nat in
+                    RECEIVEBALANCE(?uid, ?newBalance);
+                    if uid == ID then
+                        use newBalance
+                    end if
+                end var
+            []
+                var s: StockSymbol in 
+                    s := any StockSymbol;
+                    CheckPortfolio(ID, s);
+                    RECEIVEPORTFOLIO(?any Nat, ?any StockSymbol, ?any Nat)
+                end var
+            end select
+        end loop
+    end process
+
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, UTRANSACTION: UTransaction, CHECKPRICE: Stock, SENDPRICE: Price, UTRADE: UTrade, WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, WSCONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm, CHECKPORTFOLIO: PortfolioCheckRequest, RECEIVEPORTFOLIO: PortfolioCheckResponse] (maxStock: Nat, maxBalance: Nat) is
+        var balances: BalanceArray, portfolios: PortfolioUsers in
+
+            -- Init balances
+            balances := BalanceArray(0 of Nat);
+            
+            portfolios := PortfolioUsers(
+                PortfolioStocks(0 of Nat),
+                PortfolioStocks(0 of Nat)
+            );
+
+            loop
+                var uid: Nat in
+                    select
+                        GETBALANCE(?uid);
+                        SENDBALANCE(uid, balances[uid])
+                    []
+                        var amount: Nat, transactType: TransactionType in
+                            UTRANSACTION(?uid, ?amount, ?transactType);
+                            
+                            WSTRANSACTION(uid, amount, transactType);
+                            WSCONFIRM(?uid, ?amount, ?transactType);
+
+                            if uid <= 2 then
+                                if (transactType == Deposit) and (maxBalance - amount >= balances[uid]) then
+                                    balances[uid] := balances[uid] + amount
+                                elsif (transactType == Withdraw) and (balances[uid] >= amount) then
+                                    balances[uid] := balances[uid] - amount
+                                end if
+                            end if;
+                            SENDBALANCE(uid, balances[uid])
+                        end var
+                    []
+                        var symbol: StockSymbol, price: Nat in
+                            CHECKPRICE(?uid, ?symbol);
+                            
+                            WSCHECKPRICE(uid, symbol);
+                            WSSENDPRICE(?uid, ?symbol, ?price);
+
+                            SENDPRICE(uid, symbol, price)
+                        end var
+                    []
+                        -- Handles Trading functionality
+                        var symbol: StockSymbol, amount: Nat, tradeType: TradeType in
+                            UTRADE(?uid, ?symbol, ?amount, ?tradeType);
+                            
+                            WSTRADE(uid, symbol, amount, tradeType);
+                            WSCONFIRMTRADE(?uid, ?symbol, ?amount, ?tradeType);
+
+                            var totalCost: Nat, stockPrice: Nat in
+                                -- Get price of stock and then calculate expected 
+                                WSCHECKPRICE(uid, symbol);
+                                WSSENDPRICE(?uid, ?symbol, ?stockPrice);
+
+                                totalCost := stockPrice * amount;
+                                var stockPortfolio: PortfolioStocks, stockIndex: Nat, currAmount: Nat, newAmount: Nat in
+                                    newAmount := 0;
+                                    
+                                    if uid <= 2 then
+                                        stockPortfolio := portfolios[uid];
+                                        stockIndex := GetStockIndex(symbol);
+
+                                        currAmount := stockPortfolio[stockIndex];
+
+                                        if (tradeType == Buy) and (totalCost <= balances[uid]) and (maxStock - amount >= currAmount) then
+                                            newAmount := currAmount + amount;
+                                            balances[uid] := balances[uid] - totalCost
+                                        elsif (tradeType == Sell) and (maxBalance - totalCost >= balances[uid]) and (amount <= currAmount) then
+                                            newAmount := currAmount - amount;
+                                            balances[uid] := balances[uid] + totalCost
+                                        end if;
+
+                                        stockPortfolio[stockIndex] := newAmount;
+                                        portfolios[uid] := stockPortfolio
+                                    end if;
+
+                                    RECEIVEPORTFOLIO(uid, symbol, newAmount);
+                                    SENDBALANCE(uid, balances[uid])
+                                end var
+                            end var
+                        end var
+                    []
+                        -- Handles user Portfolio check requests
+                        var uid: Nat, symbol: StockSymbol, stockIndex: Nat, amount: Nat in
+                            CHECKPORTFOLIO(?uid, ?symbol);
+                            amount := 0;
+
+                            if uid <= 2 then
+                                stockIndex := GetStockIndex(symbol);
+
+                                amount := portfolios[uid][stockIndex]
+                            end if;
+
+                            RECEIVEPORTFOLIO(uid, symbol, amount)
+                        end var
+                    end select
+                end var
+            end loop
+        end var
+    end process
+
+
+    process StockMarketAPI [WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade] is 
+        loop
+            select
+                -- Handles receiving and sending stock prices on Channel WSPrice
+                var id: Nat, symbol: StockSymbol, price: Nat in 
+                    WSCHECKPRICE(?id, ?symbol);
+                    case symbol in
+                            AAPL -> price := 2 of Nat
+                        |   NVDA -> price := 1 of Nat
+                    end case;
+                    WSSENDPRICE(id, symbol, price)
+                end var
+            []
+                --Handles Mock trade confirmations
+                var id: Nat, symbol: StockSymbol, amount: Nat, tradeType: TradeType in 
+                    TRADE(?id, ?symbol, ?amount, ?tradeType);
+                    -- Mock confirmed...
+                    CONFIRMTRADE(id, symbol, amount, tradeType)
+                end var
+            end select
+        end loop
+    end process
+
+    process BankAccountAPI [TRANSACTION: WSTransaction, SENDCONFIRM: WSConfirm] (maxBalance: Nat) is
+        var balances: BalanceArray in
+            -- Init balances
+            balances := BalanceArray(maxBalance of Nat);
+
+            loop
+                var uid: Nat, amount: Nat, transactType: TransactionType in
+                    TRANSACTION(?uid, ?amount, ?transactType);
+                    if uid <= 2 then
+                        if (transactType == Deposit) and (balances[uid] >= amount) then
+                            balances[uid] := balances[uid] - amount -- Deposite into WSAccount so withdraw from bank account
+                        elsif (transactType == Withdraw) and (maxBalance - amount >= balances[uid]) then
+                            balances[uid] := balances[uid] + amount -- Withdraw from WSAccount so deposit into bank account
+                        else
+                            amount := 0 -- Transaction invalid
+                        end if
+                    end if;
+                    SENDCONFIRM(uid, amount, transactType)
+                end var
+            end loop
+        end var
+    end process
+
+    process Main [
+                    GETBALANCE: Uid,
+                    SENDBALANCE: Balance,
+                    UTRANSACTION: UTransaction,
+                    CHECKPRICE: Stock,
+                    SENDPRICE: Price,
+                    UTRADE: UTrade,
+                    WSCHECKPRICE: WSPriceCheck,
+                    WSSENDPRICE: WSPriceSend,
+                    WSTRADE: WSTrade,
+                    CONFIRMTRADE: WSConfirmTrade,
+                    WSTRANSACTION: WSTransaction,
+                    WSCONFIRM: WSConfirm,
+                    CHECKPORTFOLIO: PortfolioCheckRequest,
+                    RECEIVEPORTFOLIO: PortfolioCheckResponse
+                ]
+                (maxStock: Nat, maxBalance: Nat) is
+        
+        --hide WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm in
+            par
+                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (maxStock, maxBalance)
+                ||
+                GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> par
+                    User [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (1 of Nat)
+                    ||
+                    User [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (2 of Nat)
+                end par
+                ||
+                WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE -> StockMarketAPI[WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE]
+                ||
+                WSTRANSACTION, WSCONFIRM -> BankAccountAPI[WSTRANSACTION, WSCONFIRM] (maxBalance)
+            end par
+        --end hide
+    end process
+
+end module
