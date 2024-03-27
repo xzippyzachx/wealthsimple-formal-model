@@ -11,7 +11,7 @@ is
 	expected TRUE;
 end property
 
-property Property_liveness_w1
+property PROPERTY_liveness_1
 	"Trading a stock will involve communication with the stockMarketAPI to check stock prices, and to confirm trades. As well as other events such as balance sending."
 is
     "WealthSimple.bcg"
@@ -29,17 +29,7 @@ is
 	expected TRUE;
 end property
 
-property Property_safety_w2
-	"A stock market API will never confirm a trade that wasn't requested"
-is
-    "WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	NOT_1_BEFORE_2({WSCONFIRMTRADE...}, {WSTRADE...});
-	expected TRUE;
-end property
-
-property Property_liveness_w3
+property PROPERTY_liveness_2
 	"A stock market API will always confirm a trade after receiving it"
 is
     "WealthSimple.bcg"
@@ -49,57 +39,7 @@ is
 	expected TRUE;
 end property
 
-property Property_fairness_w4
-	"After performing a trade, the user can check the status of their portfolio"
-is
-    "WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	AFTER_1_FAIRLY_2({UTRADE...}, {CHECKPORTFOLIO...});
-	expected TRUE;
-end property
-
-property Property_safety_w5_safety
-	"A request to check portfolio will always be met with an immediate response"
-is
-    "WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	AFTER_1_INEVITABLE_2({CHECKPORTFOLIO...}, {RECEIVEPORTFOLIO...});
-	expected TRUE;
-end property
-
-property Property_fairness_w6
-	"After performing a trade, the user can check their balance"
-is
-    "WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	AFTER_1_FAIRLY_2({UTRADE...}, {SENDBALANCE...});
-	expected TRUE;
-end property
-
-property PROPERTY_safety_z1
-	"The stock market API will never send a stock price that wasn't being requested"
-is
-	"WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	NOT_1_BEFORE_2({WSSENDPRICE ...}, {WSCHECKPRICE ...});
-	expected TRUE;
-end property
-
-property PROPERTY_safety_z2
-	"The WealthSimple account will never send a stock price that wasn't being requested"
-is
-	"WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	NOT_1_BEFORE_2({SENDPRICE ...}, {CHECKPRICE ...});
-	expected TRUE;
-end property
-
-property PROPERTY_liveness_z3
+property PROPERTY_liveness_3
 	"A user requesting a stock price check will eventually result in receiving the stock price"
 is
 	"WealthSimple.bcg"
@@ -109,7 +49,37 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_fairness_z4
+property PROPERTY_liveness_4
+	"A user requesting their balance will eventually result in receiving their balance"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	SOME({GETBALANCE...}.true*.{SENDBALANCE...});
+	expected TRUE;
+end property
+
+property PROPERTY_fairness_1
+	"After performing a trade, the user can check the status of their portfolio"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_FAIRLY_2({UTRADE...}, {CHECKPORTFOLIO...});
+	expected TRUE;
+end property
+
+property PROPERTY_fairness_2
+	"After performing a trade, the user can check their balance"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_FAIRLY_2({UTRADE...}, {SENDBALANCE...});
+	expected TRUE;
+end property
+
+property PROPERTY_fairness_3
 	"Performing a trade will always require checking the price stock"
 is
 	"WealthSimple.bcg"
@@ -119,7 +89,57 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_a1
+property PROPERTY_fairness_4
+	"BankAccountAPI transactions and confirmations alternate"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	ALTERNATE_1_THEN_2({WSTRANSACTION...}, {WSCONFIRM...});
+	expected TRUE;
+end property
+
+property PROPERTY_safety_1
+	"A request to check portfolio will always be met with an immediate response"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	AFTER_1_INEVITABLE_2({CHECKPORTFOLIO...}, {RECEIVEPORTFOLIO...});
+	expected TRUE;
+end property
+
+property PROPERTY_safety_2
+	"The stock market API will never send a stock price that wasn't being requested"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NOT_1_BEFORE_2({WSSENDPRICE ...}, {WSCHECKPRICE ...});
+	expected TRUE;
+end property
+
+property PROPERTY_safety_3
+	"A stock market API will never confirm a trade that wasn't requested"
+is
+    "WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NOT_1_BEFORE_2({WSCONFIRMTRADE...}, {WSTRADE...});
+	expected TRUE;
+end property
+
+property PROPERTY_safety_4
+	"The WealthSimple account will never send a stock price that wasn't being requested"
+is
+	"WealthSimple.bcg"
+    |= with evaluator4
+	library standard.mcl end_library
+	NOT_1_BEFORE_2({SENDPRICE ...}, {CHECKPRICE ...});
+	expected TRUE;
+end property
+
+property PROPERTY_safety_5
 	"Only user transaction and user trades can affect the user balance"
 is 
 	"WealthSimple.bcg"
@@ -133,7 +153,7 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_a2
+property PROPERTY_safety_6
 	"BankAccountAPI cannot confirm a transaction before it is requested by the user, then processed by the bank"
 is
 	"WealthSimple.bcg"
@@ -143,17 +163,7 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_a3
-	"BankAccountAPI transactions and confirmations alternate"
-is
-	"WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	ALTERNATE_1_THEN_2 ({WSTRANSACTION...}, {WSCONFIRM...});
-	expected TRUE;
-end property
-
-property PROPERTY_a4
+property PROPERTY_safety_7
 	"A user cannot withdraw more than they have as available cash in their WealthSimple account"
 is
 	"WealthSimple.bcg"
@@ -168,7 +178,7 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_a5
+property PROPERTY_safety_8
 	"WealthSimple balance is a correctly updated after bank deposits"
 is
 	"WealthSimple.bcg"
@@ -184,7 +194,7 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_a6
+property PROPERTY_safety_9
 	"WealthSimple balance is a correctly updated after bank withdrawal"
 is
 	"WealthSimple.bcg"
@@ -197,15 +207,5 @@ is
 	(not {UTRADE...} and not {UTRANSACTION...})*.
 	{SENDBALANCE(!id ?newBalance:Nat) where (originalBalance - depositAmount) <> newBalance}
 	);
-	expected TRUE;
-end property
-
-property PROPERTY_liveness_a7
-	"A user requesting their balance will eventually result in receiving their balance"
-is
-	"WealthSimple.bcg"
-    |= with evaluator4
-	library standard.mcl end_library
-	SOME({GETBALANCE...}.true*.{SENDBALANCE...});
 	expected TRUE;
 end property
