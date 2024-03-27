@@ -275,18 +275,18 @@ module WealthSimple with set, get is
                     CHECKPRICE: Stock,
                     SENDPRICE: Price,
                     UTRADE: UTrade,
-                    -- WSCHECKPRICE: WSPriceCheck,
-                    -- WSSENDPRICE: WSPriceSend,
-                    -- WSTRADE: WSTrade,
-                    -- CONFIRMTRADE: WSConfirmTrade,
-                    -- WSTRANSACTION: WSTransaction,
-                    -- WSCONFIRM: WSConfirm,
+                    WSCHECKPRICE: WSPriceCheck,
+                    WSSENDPRICE: WSPriceSend,
+                    WSTRADE: WSTrade,
+                    CONFIRMTRADE: WSConfirmTrade,
+                    WSTRANSACTION: WSTransaction,
+                    WSCONFIRM: WSConfirm,
                     CHECKPORTFOLIO: PortfolioCheckRequest,
                     RECEIVEPORTFOLIO: PortfolioCheckResponse
                 ]
                 (maxStock: Nat, maxBalance: Nat) is
         
-        hide WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm in
+        --hide WSCHECKPRICE: WSPriceCheck, WSSENDPRICE: WSPriceSend, WSTRADE: WSTrade, CONFIRMTRADE: WSConfirmTrade, WSTRANSACTION: WSTransaction, WSCONFIRM: WSConfirm in
             par
                 GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO -> WSAccount [GETBALANCE, SENDBALANCE, UTRANSACTION, CHECKPRICE, SENDPRICE, UTRADE, WSCHECKPRICE, WSSENDPRICE, WSTRADE, CONFIRMTRADE, WSTRANSACTION, WSCONFIRM, CHECKPORTFOLIO, RECEIVEPORTFOLIO] (maxStock, maxBalance)
                 ||
@@ -300,7 +300,7 @@ module WealthSimple with set, get is
                 ||
                 WSTRANSACTION, WSCONFIRM -> BankAccountAPI[WSTRANSACTION, WSCONFIRM] (maxBalance)
             end par
-        end hide
+        --end hide
     end process
 
 end module

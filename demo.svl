@@ -11,7 +11,6 @@ is
 	expected TRUE;
 end property
 
-
 property Property_liveness_w1
 	"Trading a stock will involve communication with the stockMarketAPI to check stock prices, and to confirm trades. As well as other events such as balance sending."
 is
@@ -90,7 +89,6 @@ is
 	expected TRUE;
 end property
 
-
 property PROPERTY_safety_z2
 	"The WealthSimple account will never send a stock price that wasn't being requested"
 is
@@ -134,7 +132,6 @@ is
 	);
 	expected TRUE;
 end property
-
 
 property PROPERTY_a2
 	"BankAccountAPI cannot confirm a transaction before it is requested by the user, then processed by the bank"
@@ -203,7 +200,6 @@ is
 	expected TRUE;
 end property
 
-
 property PROPERTY_a7
 	"GETBALANCE results in SENDBALANCE"
 is
@@ -213,5 +209,3 @@ is
 	SOME({GETBALANCE...}.true*.{SENDBALANCE...});
 	expected TRUE;
 end property
-
-	
