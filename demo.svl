@@ -2,8 +2,8 @@
 "WealthSimple.bcg" = generation of "WealthSimple.lnt":"Main(1, 5)";
 
 (**)
-property PROPERTY_deadlock
-	"Deadlock free"
+property PROPERTY_deadlock_1
+	"Deadlock free (There are no terminate states in this model)"
 is
     "WealthSimple.bcg"
     |= with evaluator4
@@ -109,14 +109,14 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_liveness_z4
-	"CONFIRMTRADE results in WSCHECKPRICE"
+property PROPERTY_fairness_z4
+	"Performing a trade will always require checking the price stock"
 is
 	"WealthSimple.bcg"
     |= with evaluator4
 	library standard.mcl end_library
 	SOME(true*.{CONFIRMTRADE...}.{WSCHECKPRICE...});
-	expected TRUE; (*Fails right now*)
+	expected TRUE;
 end property
 
 property PROPERTY_a1
@@ -200,8 +200,8 @@ is
 	expected TRUE;
 end property
 
-property PROPERTY_a7
-	"GETBALANCE results in SENDBALANCE"
+property PROPERTY_liveness_a7
+	"A user requesting their balance will eventually result in receiving their balance"
 is
 	"WealthSimple.bcg"
     |= with evaluator4
