@@ -1,0 +1,163 @@
+module WealthSimple with set, get is
+
+    channel Uid is (id: Nat) end channel
+    channel Balance is (id: Nat, b: Nat) end channel
+    channel Amount is (id: Nat, a: Nat) end channel
+    channel Stock is (id: Nat, s: StockSymbol) end channel
+    channel Price is (id: Nat, s: StockSymbol, a: Nat) end channel
+
+    channel WSPriceCheck is (id: Nat, symbol: StockSymbol) end channel
+    channel WSPriceSend is (id: Nat, symbol: StockSymbol, price: Nat) end channel
+    channel WSTrade is (id: Nat, symbol: StockSymbol, Transacttype: TransactionType) end channel
+    channel WSTradeConfirm is (id: Nat, symbol: StockSymbol, Transacttype: TransactionType) end channel
+
+    type StockSymbol is
+        AAPL, NVDA, TSLA, AMZN
+    end type
+
+    type BalanceArray is
+        array [1 .. 5] of Nat
+    end type
+
+    type TransactionType is 
+        Buy, Sell
+    end type
+
+    process User [DISPLAYBALANCE, GETBALANCE: Uid, RECIVEBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, RECIVEPRICE: Price] (ID: Nat) is
+        var disBalance: Nat, waiting: bool in
+            disBalance := 0;
+            waiting := false;
+            loop
+                select
+                    if waiting == false then
+                        GETBALANCE(ID);
+                        waiting := true
+                    end if
+                []
+                    var uid: Nat, newBalance: Nat in
+                        RECIVEBALANCE(?uid, ?newBalance);
+                        if uid == ID then
+                            disBalance := newBalance;
+                            waiting := false
+                        end if
+                    end var
+                []
+                    if (waiting == false) and (disBalance != 0) then
+                        DISPLAYBALANCE(disBalance) -- Temp proccess cuz I don't know how to display values. If we even can?
+                    end if
+                []
+                    if waiting == false then
+                        var a: Nat in
+                            DEPOSIT(ID, ?a) where (a == 5) or (a == 10) or (a == 20)
+                        end var;
+                        waiting := true
+                    end if
+                []
+                    if (waiting == false) then
+                        var a: Nat in
+                            WITHDRAW(ID, ?a) where (a == 5) or (a == 10) or (a == 20)
+                        end var;
+                        waiting := true
+                    end if
+                []
+                    if (waiting == false) then
+                        var symbol: StockSymbol in
+                            symbol := any StockSymbol;
+                            CHECKPRICE(ID, symbol)
+                        end var;
+                        waiting := true
+                    end if
+                []
+                    var uid: Nat in -- , symbol: StockSymbol, price: Nat
+                        RECIVEPRICE(?uid, ?any StockSymbol, ?any Nat);
+                        if uid == ID then
+                            waiting := false
+                        end if
+                    end var
+                end select
+            end loop
+        end var
+    end process
+
+    process WSAccount [GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price, WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend] is
+        var balances: BalanceArray in
+
+            -- Init balances
+            balances := BalanceArray(0 of Nat);
+
+            loop
+                var uid: Nat in
+                    select
+                        GETBALANCE(?uid);
+                        SENDBALANCE(uid, balances[uid])
+                    []
+                        var amount: Nat in
+                            DEPOSIT(?uid, ?amount);
+                            if (uid < 6) and (balances[uid] <= 235) then
+                                balances[uid] := balances[uid] + amount
+                            end if;
+                            SENDBALANCE(uid, balances[uid])
+                        end var
+                    []
+                        var amount: Nat in
+                            WITHDRAW(?uid, ?amount);
+                            if (uid < 6) and (balances[uid] >= amount) then
+                                balances[uid] := balances[uid] - amount
+                            end if;
+                            SENDBALANCE(uid, balances[uid])
+                        end var
+                    []
+                        var symbol: StockSymbol, price: Nat in
+                            CHECKPRICE(?uid, ?symbol);
+                            
+                            WSPRICECHECKING(uid, symbol);
+                            WSPRICESENDING(?uid, ?symbol, ?price);
+
+                            SENDPRICE(uid, symbol, price)
+                        end var
+                    end select
+                end var
+            end loop
+        end var
+    end process
+
+
+    process StockMarketAPI [WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is 
+        loop
+            select
+                -- Handles receiving and sending stock prices on Channel WSPrice
+                var id: Nat, symbo: StockSymbol, price: Nat in 
+                    WSPRICECHECKING(?id, ?symbo);
+                    case symbo in
+                            AAPL -> price := 20 of Nat
+                        |   NVDA -> price := 15 of Nat
+                        |   TSLA -> price := 10 of Nat
+                        |   AMZN -> price := 5 of Nat
+                    end case;
+                    WSPRICESENDING(id, symbo, price)
+                end var
+                []
+                --Handles Mock trade confirmations
+                var id: Nat, symbol: StockSymbol, Transacttype: TransactionType in 
+                    TRADE(?id, ?symbol, ?Transacttype);
+                    CONFIRMTRADE(id, symbol, Transacttype)
+                end var
+            end select
+        end loop
+    end process
+
+    process Main [DISPLAYBALANCE, GETBALANCE: Uid, SENDBALANCE: Balance, DEPOSIT: Amount, WITHDRAW: Amount, CHECKPRICE: Stock, SENDPRICE: Price, 
+                    WSPRICECHECKING: WSPriceCheck, WSPRICESENDING: WSPriceSend, TRADE: WSTrade, CONFIRMTRADE: WSTradeConfirm] is
+        var u1: Nat in
+            u1 := 1;
+            par
+                GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE, WSPRICECHECKING, WSPRICESENDING -> WSAccount [GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE, WSPRICECHECKING, WSPRICESENDING]
+                ||
+                GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE -> User [DISPLAYBALANCE, GETBALANCE, SENDBALANCE, DEPOSIT, WITHDRAW, CHECKPRICE, SENDPRICE] (u1)
+                ||
+                WSPRICECHECKING, WSPRICESENDING -> StockMarketAPI[WSPRICECHECKING, WSPRICESENDING, TRADE, CONFIRMTRADE]
+            end par
+        end var
+    end process
+
+end module
